@@ -285,16 +285,39 @@ public function webhook(Request $request)
 
     if ($event->type === 'invoice.paid') {
         $invoice = $event->data->object;
+        \Log::info('Invoice paid debug', [
+    'invoice_id' => $invoice->id ?? null,
+    'customer' => $invoice->customer ?? null,
+    'subscription' => $invoice->subscription ?? null,
+    'parent_subscription_details' => $invoice->parent->subscription_details->subscription ?? null,
+    'raw' => $invoice->toArray(),
+]);
 
         $tenant = Tenant::where('stripe_customer_id', $invoice->customer)->first();
 
-        if ($tenant && $invoice->subscription) {
-            $this->syncTenantSubscriptionFromStripe(
-                $tenant,
-                $invoice->subscription,
-                'invoice.paid'
-            );
-        }
+        $subscriptionId = $invoice->subscription
+    ?? ($invoice->parent->subscription_details->subscription ?? null);
+
+if ($tenant && $subscriptionId) {
+    $this->syncTenantSubscriptionFromStripe(
+        $tenant,
+        $subscriptionId,
+        'invoice.paid'
+    );
+}
+        // if ($tenant && $invoice->subscription) {
+        //     $this->syncTenantSubscriptionFromStripe(
+        //         $tenant,
+        //         $invoice->subscription,
+        //         'invoice.paid'
+        //     );
+        // }
+    }else {
+        \Log::warning('No se pudo procesar invoice.paid', [
+            'tenant_found' => (bool) $tenant,
+            'customer' => $invoice->customer ?? null,
+            'subscription_id' => $subscriptionId,
+        ]);
     }
 
     if ($event->type === 'customer.subscription.updated'
