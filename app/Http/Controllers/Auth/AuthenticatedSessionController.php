@@ -31,7 +31,7 @@ class AuthenticatedSessionController extends Controller
 
     //     return redirect()->intended(RouteServiceProvider::HOME);
     // }
-    public function store(LoginRequest $request): RedirectResponse
+public function store(LoginRequest $request): RedirectResponse
 {
     $request->authenticate();
 
@@ -39,14 +39,12 @@ class AuthenticatedSessionController extends Controller
 
     $user = Auth::user();
 
-    // Usuario de un tenant/client
     if (!is_null($user->tenant_id)) {
-        return redirect()->intended(route('client.dashboard'));
+        return redirect()->route('client.dashboard');
     }
 
-    // Usuario administrador del SaaS
     if ($user->hasRole('admin')) {
-        return redirect()->intended(route('admin.dashboard'));
+        return redirect()->route('admin.dashboard');
     }
 
     Auth::guard('web')->logout();
