@@ -182,6 +182,7 @@ public function store(Request $request)
 // }
 public function webhook(Request $request)
 {
+    \Log::info('WEBHOOK STRIPE ENTRÓ');
     $payload = $request->getContent();
     $sigHeader = $request->server('HTTP_STRIPE_SIGNATURE');
 
