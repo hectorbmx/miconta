@@ -210,14 +210,24 @@ public function webhook(Request $request)
     'current_period_end' => $subscription->current_period_end ?? null,
     'raw' => $subscription->toArray(),
 ]);
+\Log::info('Tenant antes de update Stripe', [
+    'tenant_id' => $tenant->id,
+    'stripe_customer_id' => $tenant->stripe_customer_id,
+    'subscription_id' => $subscription->id,
+    'subscription_status' => $subscription->status,
+    'current_period_end' => $subscription->current_period_end ?? null,
+]);
 
             $tenant->update([
                 'stripe_subscription_id' => $subscription->id,
                 'stripe_status' => $subscription->status,
 
-               'current_period_ends_at' => isset($subscription->items->data[0]->current_period_end)
-                    ? \Carbon\Carbon::createFromTimestamp($subscription->items->data[0]->current_period_end)
-                    : null,
+            //    'current_period_ends_at' => isset($subscription->items->data[0]->current_period_end)
+            //         ? \Carbon\Carbon::createFromTimestamp($subscription->items->data[0]->current_period_end)
+            //         : null,
+            'current_period_ends_at' => $subscription->current_period_end
+            ? \Carbon\Carbon::createFromTimestamp($subscription->current_period_end)
+            : null,
 
                 'cancel_at' => $subscription->cancel_at
                     ? \Carbon\Carbon::createFromTimestamp($subscription->cancel_at)
