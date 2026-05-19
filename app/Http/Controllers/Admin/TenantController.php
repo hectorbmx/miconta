@@ -180,9 +180,74 @@ public function store(Request $request)
 
 //     return response('OK', 200);
 // }
+// public function webhook(Request $request)
+// {
+//     \Log::info('WEBHOOK STRIPE ENTRÓ');
+//     $payload = $request->getContent();
+//     $sigHeader = $request->server('HTTP_STRIPE_SIGNATURE');
+
+//     try {
+//         $event = Webhook::constructEvent(
+//             $payload,
+//             $sigHeader,
+//             config('services.stripe.webhook_secret')
+//         );
+//     } catch (\Exception $e) {
+//         return response('Invalid', 400);
+//     }
+
+//     if ($event->type === 'checkout.session.completed') {
+//         $session = $event->data->object;
+
+//         $tenant = Tenant::where('stripe_customer_id', $session->customer)->first();
+
+//         if ($tenant && $session->subscription) {
+//             $stripe = new StripeClient(config('services.stripe.secret'));
+
+//             $subscription = $stripe->subscriptions->retrieve($session->subscription);
+//             \Log::info('Stripe subscription debug', [
+//     'subscription_id' => $subscription->id,
+//     'status' => $subscription->status,
+//     'current_period_end' => $subscription->current_period_end ?? null,
+//     'raw' => $subscription->toArray(),
+// ]);
+// \Log::info('Tenant antes de update Stripe', [
+//     'tenant_id' => $tenant->id,
+//     'stripe_customer_id' => $tenant->stripe_customer_id,
+//     'subscription_id' => $subscription->id,
+//     'subscription_status' => $subscription->status,
+//     'current_period_end' => $subscription->current_period_end ?? null,
+// ]);
+
+
+//             $tenant->update([
+//                 'stripe_subscription_id' => $subscription->id,
+//                 'stripe_status' => $subscription->status,
+
+//             //    'current_period_ends_at' => isset($subscription->items->data[0]->current_period_end)
+//             //         ? \Carbon\Carbon::createFromTimestamp($subscription->items->data[0]->current_period_end)
+//             //         : null,
+//             'current_period_ends_at' => $subscription->current_period_end
+//             ? \Carbon\Carbon::createFromTimestamp($subscription->current_period_end)
+//             : null,
+
+//                 'cancel_at' => $subscription->cancel_at
+//                     ? \Carbon\Carbon::createFromTimestamp($subscription->cancel_at)
+//                     : null,
+
+//                 'canceled_at' => $subscription->canceled_at
+//                     ? \Carbon\Carbon::createFromTimestamp($subscription->canceled_at)
+//                     : null,
+//             ]);
+//         }
+//     }
+
+//     return response('OK', 200);
+// }
 public function webhook(Request $request)
 {
     \Log::info('WEBHOOK STRIPE ENTRÓ');
+
     $payload = $request->getContent();
     $sigHeader = $request->server('HTTP_STRIPE_SIGNATURE');
 
@@ -193,8 +258,16 @@ public function webhook(Request $request)
             config('services.stripe.webhook_secret')
         );
     } catch (\Exception $e) {
+        \Log::error('Stripe webhook inválido', [
+            'message' => $e->getMessage(),
+        ]);
+
         return response('Invalid', 400);
     }
+
+    \Log::info('Stripe event recibido', [
+        'type' => $event->type,
+    ]);
 
     if ($event->type === 'checkout.session.completed') {
         $session = $event->data->object;
@@ -202,46 +275,111 @@ public function webhook(Request $request)
         $tenant = Tenant::where('stripe_customer_id', $session->customer)->first();
 
         if ($tenant && $session->subscription) {
-            $stripe = new StripeClient(config('services.stripe.secret'));
+            $this->syncTenantSubscriptionFromStripe(
+                $tenant,
+                $session->subscription,
+                'checkout.session.completed'
+            );
+        }
+    }
 
-            $subscription = $stripe->subscriptions->retrieve($session->subscription);
-            \Log::info('Stripe subscription debug', [
-    'subscription_id' => $subscription->id,
-    'status' => $subscription->status,
-    'current_period_end' => $subscription->current_period_end ?? null,
-    'raw' => $subscription->toArray(),
-]);
-\Log::info('Tenant antes de update Stripe', [
-    'tenant_id' => $tenant->id,
-    'stripe_customer_id' => $tenant->stripe_customer_id,
-    'subscription_id' => $subscription->id,
-    'subscription_status' => $subscription->status,
-    'current_period_end' => $subscription->current_period_end ?? null,
-]);
+    if ($event->type === 'invoice.paid') {
+        $invoice = $event->data->object;
 
-            $tenant->update([
-                'stripe_subscription_id' => $subscription->id,
-                'stripe_status' => $subscription->status,
+        $tenant = Tenant::where('stripe_customer_id', $invoice->customer)->first();
 
-            //    'current_period_ends_at' => isset($subscription->items->data[0]->current_period_end)
-            //         ? \Carbon\Carbon::createFromTimestamp($subscription->items->data[0]->current_period_end)
-            //         : null,
-            'current_period_ends_at' => $subscription->current_period_end
-            ? \Carbon\Carbon::createFromTimestamp($subscription->current_period_end)
-            : null,
+        if ($tenant && $invoice->subscription) {
+            $this->syncTenantSubscriptionFromStripe(
+                $tenant,
+                $invoice->subscription,
+                'invoice.paid'
+            );
+        }
+    }
 
-                'cancel_at' => $subscription->cancel_at
-                    ? \Carbon\Carbon::createFromTimestamp($subscription->cancel_at)
-                    : null,
+    if ($event->type === 'customer.subscription.updated'
+        || $event->type === 'customer.subscription.created'
+        || $event->type === 'customer.subscription.deleted') {
 
-                'canceled_at' => $subscription->canceled_at
-                    ? \Carbon\Carbon::createFromTimestamp($subscription->canceled_at)
-                    : null,
-            ]);
+        $subscription = $event->data->object;
+
+        $tenant = Tenant::where('stripe_customer_id', $subscription->customer)->first();
+
+        if ($tenant) {
+            $this->updateTenantFromSubscriptionObject(
+                $tenant,
+                $subscription,
+                $event->type
+            );
         }
     }
 
     return response('OK', 200);
+}
+
+private function syncTenantSubscriptionFromStripe(Tenant $tenant, string $subscriptionId, string $source): void
+{
+    try {
+        $stripe = new StripeClient(config('services.stripe.secret'));
+
+        $subscription = $stripe->subscriptions->retrieve($subscriptionId);
+
+        $this->updateTenantFromSubscriptionObject($tenant, $subscription, $source);
+
+    } catch (\Exception $e) {
+        \Log::error('Error consultando subscription Stripe', [
+            'tenant_id' => $tenant->id,
+            'subscription_id' => $subscriptionId,
+            'source' => $source,
+            'message' => $e->getMessage(),
+        ]);
+    }
+}
+
+private function updateTenantFromSubscriptionObject(Tenant $tenant, $subscription, string $source): void
+{
+    try {
+        $currentPeriodEnd = $subscription->current_period_end
+            ?? ($subscription->items->data[0]->current_period_end ?? null);
+
+        \Log::info('Actualizando tenant desde Stripe', [
+            'source' => $source,
+            'tenant_id' => $tenant->id,
+            'stripe_customer_id' => $tenant->stripe_customer_id,
+            'subscription_id' => $subscription->id,
+            'subscription_status' => $subscription->status,
+            'current_period_end' => $currentPeriodEnd,
+        ]);
+
+        $tenant->update([
+            'stripe_subscription_id' => $subscription->id,
+            'stripe_status' => $subscription->status,
+
+            'current_period_ends_at' => $currentPeriodEnd
+                ? \Carbon\Carbon::createFromTimestamp($currentPeriodEnd)
+                : null,
+
+            'cancel_at' => $subscription->cancel_at
+                ? \Carbon\Carbon::createFromTimestamp($subscription->cancel_at)
+                : null,
+
+            'canceled_at' => $subscription->canceled_at
+                ? \Carbon\Carbon::createFromTimestamp($subscription->canceled_at)
+                : null,
+        ]);
+
+        \Log::info('Tenant actualizado OK desde Stripe', [
+            'source' => $source,
+            'tenant_id' => $tenant->id,
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Error actualizando tenant Stripe', [
+            'source' => $source,
+            'tenant_id' => $tenant->id,
+            'message' => $e->getMessage(),
+        ]);
+    }
 }
 public function resendInvitation(Tenant $tenant)
 {
