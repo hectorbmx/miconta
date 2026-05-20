@@ -56,25 +56,39 @@
                     </div>
 
                     {{-- Actualizar FIEL / E.FIRMA --}}
-                    <div class="space-y-4">
-                        <h3 class="font-bold text-gray-700 uppercase text-xs tracking-wider">Actualizar FIEL / E.FIRMA</h3>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Certificado (.cer)</label>
-                            <input type="file" name="certificate" class="w-full mt-1">
-                        </div>
+                    {{-- Actualizar FIEL / E.FIRMA --}}
+<div class="space-y-4">
+    <h3 class="font-bold text-gray-700 uppercase text-xs tracking-wider">Actualizar FIEL / E.FIRMA</h3>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-700">Certificado (.cer)</label>
+        <input type="file" name="certificate" class="w-full mt-1">
+    </div>
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Llave privada (.key)</label>
-                            <input type="file" name="private_key" class="w-full mt-1">
-                        </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-700">Llave privada (.key)</label>
+        <input type="file" name="private_key" class="w-full mt-1">
+    </div>
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Contraseña FIEL</label>
-                            <input type="password" name="fiel_password" placeholder="••••••••" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm">
-                        </div>
-                    </div>
-                </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-700">Contraseña FIEL</label>
+        <input type="password" name="fiel_password" placeholder="••••••••" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm">
+        <p class="text-[10px] text-gray-400 mt-1 italic">Solo escribe si deseas cambiar la contraseña actual.</p>
+    </div>
+
+    {{-- Nuevo: Input Contraseña CIEC --}}
+    <div>
+        <label class="block text-sm font-medium text-gray-700">Contraseña CIEC</label>
+        <input type="password" name="ciec_password" placeholder="••••••••" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm">
+        <p class="text-[10px] text-gray-400 mt-1 italic">Solo escribe si deseas cambiar la contraseña CIEC actual.</p>
+    </div>
+
+    {{-- Nuevo: Checkbox espacios --}}
+    <div class="flex items-center">
+        <input type="checkbox" name="password_has_spaces" id="password_has_spaces" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+        <label for="password_has_spaces" class="ml-2 text-sm text-gray-600">La contraseña incluye espacios al final</label>
+    </div>
+</div>
 
                 <div class="mt-8 flex justify-end">
                     <button type="submit" class="bg-gray-900 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-800">
