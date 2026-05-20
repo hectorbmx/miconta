@@ -11,7 +11,7 @@
     use Stripe\StripeClient;
     use Illuminate\Support\Facades\Mail;
     use Illuminate\Support\Facades\Storage;
-
+    use App\Models\SatCsfRequest;
 
     class ClienteController extends Controller
     {
@@ -70,24 +70,28 @@
          * Ver cliente
          */
    public function show(Customer $customer)
-{
-    $this->authorizeTenant($customer);
+    {
+        $this->authorizeTenant($customer);
 
-    $customer->load(['satDownloadRequests', 'satCfdis']);
+        $customer->load(['satDownloadRequests', 'satCfdis']);
+        $csfRequests = SatCsfRequest::where('customer_id', $customer->id)
+        ->latest()
+        ->take(10)
+        ->get();
 
-    return view('client.clientes.show', [
-        'customer' => $customer,
-        'cliente'  => $customer,
-    ]);
-}
+        return view('client.clientes.show', [
+            'customer' => $customer,
+            'cliente'  => $customer,
+            'csfRequests' => $csfRequests,
+
+        ]);
+    }
         /**
          * Formulario edición
          */
-        public function edit(Cliente $cliente)
-        {
-            $this->authorizeTenant($cliente);
-
-            return view('client.clientes.edit', compact('cliente'));
+       public function edit(Customer $customer) {
+            $this->authorizeTenant($customer);
+            return view('client.clientes.edit', compact('customer'));
         }
 
         /**
@@ -108,6 +112,7 @@
             // 'private_key' => 'nullable|file|mimes:key',
             'private_key' => 'nullable|file|extensions:key',
             'fiel_password' => 'nullable|string|max:255',
+            'ciec_password' => 'nullable|string|max:255',
         ]);
 
         $data = [
@@ -155,6 +160,9 @@
 
         $data['fiel_password'] = $password;
     }
+    if ($request->filled('ciec_password')) {
+    $data['ciec_password'] = $request->ciec_password;
+}
 
         $customer->update($data);
 

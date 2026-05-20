@@ -120,6 +120,7 @@ class SatDownloadRequestController extends Controller
      */
     public function process(SatDownloadRequest $downloadRequest)
     {
+        
         $this->authorizeTenant($downloadRequest);
 
         if ($downloadRequest->estado === 'verifying') {

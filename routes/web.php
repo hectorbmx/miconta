@@ -14,6 +14,7 @@ use App\Http\Controllers\Client\Sat\SatDownloadRequestController;
 use App\Http\Controllers\Client\Sat\SatCfdiController;
 
 use App\Http\Controllers\Client\Sat\CsfController;
+use App\Http\Controllers\Client\Sat\SatCsfRequestController;
 
 
 
@@ -142,10 +143,17 @@ Route::middleware(['auth', 'verified'])
                 // ... tus rutas existentes ...
 
                 // CSF - agregar aquí
-                Route::post('csf/consultar', [CsfController::class, 'consultarPorRfc'])
-                    ->name('csf.consultar');
-                Route::post('csf/pdf', [CsfController::class, 'consultarDesdePdf'])
-                    ->name('csf.pdf');
+                
+                Route::post('csf/consultar', [CsfController::class, 'consultarPorRfc'])->name('csf.consultar');
+                Route::post('csf/pdf', [CsfController::class, 'consultarDesdePdf'])->name('csf.pdf');
+                Route::resource('download-requests', SatDownloadRequestController::class);
+                Route::post('download-requests/{downloadRequest}/process',[SatDownloadRequestController::class, 'process'])->name('download-requests.process');
+                Route::get('customers/{customer}/csf',[SatCsfRequestController::class, 'index'])->name('csf.index');
+                Route::post('customers/{customer}/csf',[SatCsfRequestController::class, 'store'])->name('csf.store');
+                Route::get('customers/{customer}/csf/{satCsfRequest}',[SatCsfRequestController::class, 'show'])->name('csf.show');
+                Route::get('customers/{customer}/csf/{satCsfRequest}/download-pdf',[SatCsfRequestController::class, 'downloadPdf'])->name('csf.download-pdf');
+
+
             });
     });
 

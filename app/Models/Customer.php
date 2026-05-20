@@ -21,10 +21,13 @@ class Customer extends Model
         'certificate_path',
         'private_key_path',
         'fiel_password',
+        'ciec_password',
     ];
 
     protected $casts = [
         'fiel_password' => 'encrypted',
+        'ciec_password' => 'encrypted',
+
     ];
 
     public function tenant()

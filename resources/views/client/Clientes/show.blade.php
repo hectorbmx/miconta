@@ -9,10 +9,16 @@
                     RFC: {{ $cliente->rfc ?? $customer->rfc }}
                 </p>
             </div>
-            <a href="{{ route('client.clientes.index') }}"
-               class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50">
-                ← Regresar
-            </a>
+            
+            {{-- En la cabecera del show.blade.php --}}
+                <div class="flex items-center gap-3">
+                    <a href="{{ route('client.clientes.edit', $cliente->id) }}" 
+                    class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Configuración
+                    </a>
+                    <a href="{{ route('client.clientes.index') }}" ...>← Regresar</a>
+                </div>
         </div>
     </x-slot>
 
@@ -199,73 +205,6 @@
 </div>
     
 
-    {{-- ROW 2: INFORMACIÓN DEL CLIENTE (ANCHO COMPLETO) --}}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
-            <h2 class="text-lg font-semibold text-gray-900">Configuración del Cliente</h2>
-            <p class="text-sm text-gray-500">Edita los datos fiscales y actualiza los archivos de la e.firma.</p>
-        </div>
-
-        <form method="POST" action="{{ route('client.clientes.update', $cliente->id) }}" enctype="multipart/form-data" class="p-6">
-            @csrf
-            @method('PUT')
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {{-- Columna Datos Fiscales --}}
-                <div class="space-y-4">
-                    <h4 class="text-xs font-bold text-blue-600 uppercase">Datos Fiscales</h4>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">RFC</label>
-                        <input type="text" name="rfc" value="{{ old('rfc', $cliente->rfc) }}" maxlength="13"
-                               class="w-full rounded-lg border-gray-300 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Razón Social</label>
-                        <input type="text" name="razon_social" value="{{ old('razon_social', $cliente->razon_social) }}"
-                               class="w-full rounded-lg border-gray-300 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Correo para Notificaciones</label>
-                        <input type="email" name="email" value="{{ old('email', $cliente->email) }}"
-                               class="w-full rounded-lg border-gray-300 focus:ring-blue-500">
-                    </div>
-                </div>
-
-                {{-- Columna Archivos FIEL --}}
-                <div class="lg:col-span-2 space-y-4">
-                    <h4 class="text-xs font-bold text-blue-600 uppercase">Actualizar FIEL / e.firma</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="p-4 border rounded-lg bg-gray-50">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Certificado (.cer)</label>
-                            <input type="file" name="certificate" accept=".cer" class="text-sm w-full">
-                        </div>
-                        <div class="p-4 border rounded-lg bg-gray-50">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Llave privada (.key)</label>
-                            <input type="file" name="private_key" accept=".key" class="text-sm w-full">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña FIEL</label>
-                        <input type="password" name="fiel_password" autocomplete="new-password"
-                               class="w-full rounded-lg border-gray-300 focus:ring-blue-500"
-                               placeholder="{{ $cliente->fiel_password ? '••••••••••••' : 'Captura la contraseña' }}">
-                        <p class="text-[10px] text-gray-400 mt-1 italic">Solo escribe si deseas cambiar la contraseña actual.</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" name="password_has_spaces" value="1" id="password_has_spaces" class="rounded text-blue-600">
-                        <label for="password_has_spaces" class="text-sm text-gray-600">La contraseña incluye espacios al final</label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-8 pt-4 border-t flex justify-end gap-3">
-                <button type="submit" class="px-6 py-2 bg-gray-900 text-white font-bold rounded-lg hover:bg-black transition">
-                    Actualizar Información
-                </button>
-            </div>
-        </form>
-    </div>
-
     {{-- SECCIÓN DESCARGAS SAT --}}
     @if($cliente->certificate_path && $cliente->private_key_path && $cliente->fiel_password)
         <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -404,7 +343,114 @@
             @endif
         </div>
     @endif
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
+    <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+        <div>
+            <h2 class="text-lg font-bold text-slate-900">
+                Constancias de Situación Fiscal
+            </h2>
+            <p class="text-sm text-slate-500">
+                Historial de constancias descargadas desde el SAT para este cliente.
+            </p>
+        </div>
 
+       <div x-data="{ loading: false }">
+    <form method="POST" 
+          action="{{ route('client.sat.csf.store', $customer) }}"
+          @submit="loading = true">
+        @csrf
+        <button type="submit"
+                class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors">
+            Descargar CSF
+        </button>
+    </form>
+
+    <div x-show="loading" 
+         class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60"
+         style="display: none;">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-600 mb-4"></div>
+            <h2 class="text-lg font-bold text-gray-800">Conectando al SAT</h2>
+            <p class="text-sm text-gray-500">Estamos procesando tu solicitud, esto puede tardar unos segundos.</p>
+        </div>
+    </div>
+</div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr class="text-left text-xs font-bold text-slate-500 uppercase">
+                    <th class="px-6 py-3">RFC</th>
+                    <th class="px-6 py-3">Fecha</th>
+                    <th class="px-6 py-3">Estado</th>
+                    <th class="px-6 py-3">Error</th>
+                    <th class="px-6 py-3 text-right">Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody class="divide-y divide-slate-100">
+                @forelse($csfRequests ?? [] as $csf)
+                    <tr>
+                        <td class="px-6 py-4 font-medium text-slate-900">
+                            {{ $csf->rfc }}
+                        </td>
+
+                        <td class="px-6 py-4 text-slate-600">
+                            {{ $csf->downloaded_at?->format('d/m/Y H:i') ?? $csf->created_at->format('d/m/Y H:i') }}
+                        </td>
+
+                        <td class="px-6 py-4">
+                            @php
+                                $csfClasses = [
+                                    'pending'     => 'bg-gray-100 text-gray-700',
+                                    'downloading' => 'bg-blue-100 text-blue-700',
+                                    'completed'   => 'bg-green-100 text-green-700',
+                                    'failed'      => 'bg-red-100 text-red-700',
+                                ];
+
+                                $csfLabels = [
+                                    'pending'     => 'Pendiente',
+                                    'downloading' => 'Descargando',
+                                    'completed'   => 'Completada',
+                                    'failed'      => 'Error',
+                                ];
+                            @endphp
+
+                            <span class="px-3 py-1 rounded-full text-xs font-bold {{ $csfClasses[$csf->estado] ?? 'bg-gray-100 text-gray-700' }}">
+                                {{ $csfLabels[$csf->estado] ?? $csf->estado }}
+                            </span>
+                        </td>
+
+                        <td class="px-6 py-4 text-red-500 text-xs">
+                            {{ $csf->error_message ? Str::limit($csf->error_message, 80) : '—' }}
+                        </td>
+
+                        <td class="px-6 py-4 text-right space-x-2">
+                            {{-- <a href="{{ route('client.sat.csf.show', [$customer, $csf]) }}"
+                               class="inline-flex px-3 py-1.5 rounded-lg border text-xs font-semibold hover:bg-slate-50">
+                                Ver
+                            </a> --}}
+
+                            @if($csf->pdf_path)
+                                <a href="{{ route('client.sat.csf.download-pdf', [$customer, $csf]) }}"
+                                   class="inline-flex px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800">
+                                    PDF
+                                </a>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-slate-500">
+                            Aún no hay constancias descargadas.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
     {{-- MODAL NUEVA SOLICITUD --}}
     <x-modal name="nueva-solicitud" :show="false">
         <div class="p-6">
