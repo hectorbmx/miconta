@@ -72,7 +72,7 @@
 
     <div>
         <label class="block text-sm font-medium text-gray-700">Contraseña FIEL</label>
-        <input type="password" name="fiel_password" placeholder="••••••••" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm">
+        <input type="password" name="fiel_password" placeholder="xxxxxx" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm">
         <p class="text-[10px] text-gray-400 mt-1 italic">Solo escribe si deseas cambiar la contraseña actual.</p>
     </div>
 
