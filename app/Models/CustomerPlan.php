@@ -18,6 +18,7 @@ class CustomerPlan extends Model
     'description',
     'price',
     'billing_period',
+    'billing_mode',
     'duration_days',
     'max_downloads',
     'max_companies',

@@ -9,6 +9,10 @@ use App\Http\Controllers\Stripe\CustomerStripeWebhookController;
 
 use App\Http\Controllers\Client\StripeConnectController;
 use App\Http\Controllers\Client\CustomerPlanController;
+use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
+use App\Http\Controllers\Client\AccountingAccountController;
+use App\Http\Controllers\Client\AccountingJournalController;
+use App\Http\Controllers\Client\AccountingThirdPartyController;
 use App\Http\Controllers\Client\ClienteController as ClientClienteController;
 use App\Http\Controllers\Client\Sat\SatDownloadRequestController;
 use App\Http\Controllers\Client\Sat\SatCfdiController;
@@ -88,9 +92,7 @@ Route::get('/dashboard', function () {
     ->name('client.')
     ->group(function () {
 
-        Route::get('/dashboard', function () {
-            return view('client.dashboard');
-        })->name('dashboard');
+        Route::get('/dashboard', [ClientDashboardController::class, 'index'])->name('dashboard');
 
         Route::resource('clientes', ClientClienteController::class)
             ->parameters(['clientes' => 'customer'])
@@ -101,6 +103,36 @@ Route::get('/dashboard', function () {
 
         Route::post('clientes/{customer}/assign-plan', [ClientClienteController::class, 'assignPlan'])
             ->name('clientes.assign-plan');
+
+        Route::post('clientes/{customer}/subscriptions/{subscription}/manual-payment', [ClientClienteController::class, 'registerManualPayment'])
+            ->name('clientes.subscriptions.manual-payment');
+
+        Route::post('clientes/{customer}/accounting-accounts/seed', [AccountingAccountController::class, 'seed'])
+            ->name('clientes.accounting-accounts.seed');
+        Route::post('clientes/{customer}/accounting-accounts', [AccountingAccountController::class, 'store'])
+            ->name('clientes.accounting-accounts.store');
+        Route::patch('clientes/{customer}/accounting-accounts/{account}/toggle', [AccountingAccountController::class, 'toggle'])
+            ->name('clientes.accounting-accounts.toggle');
+
+        Route::get('clientes/{customer}/polizas', [AccountingJournalController::class, 'index'])
+            ->name('clientes.accounting-journals.index');
+        Route::get('clientes/{customer}/reportes-contables', [AccountingJournalController::class, 'reports'])
+            ->name('clientes.accounting-journals.reports');
+        Route::post('clientes/{customer}/accounting-journals', [AccountingJournalController::class, 'store'])
+            ->name('clientes.accounting-journals.store');
+        Route::get('clientes/{customer}/accounting-journals/{journal}/edit', [AccountingJournalController::class, 'edit'])
+            ->name('clientes.accounting-journals.edit');
+        Route::patch('clientes/{customer}/accounting-journals/{journal}', [AccountingJournalController::class, 'update'])
+            ->name('clientes.accounting-journals.update');
+        Route::patch('clientes/{customer}/accounting-journals/{journal}/post', [AccountingJournalController::class, 'post'])
+            ->name('clientes.accounting-journals.post');
+
+        Route::get('clientes/{customer}/terceros', [AccountingThirdPartyController::class, 'index'])
+            ->name('clientes.third-parties.index');
+        Route::post('clientes/{customer}/terceros/sync', [AccountingThirdPartyController::class, 'sync'])
+            ->name('clientes.third-parties.sync');
+        Route::patch('clientes/{customer}/terceros/{thirdParty}', [AccountingThirdPartyController::class, 'update'])
+            ->name('clientes.third-parties.update');
 
         Route::get('/stripe/connect', [StripeConnectController::class, 'connect'])
             ->name('stripe.connect');
@@ -126,6 +158,8 @@ Route::middleware(['auth', 'verified'])
                 // CFDIs
                 Route::get('cfdis', [SatCfdiController::class, 'index'])
                     ->name('cfdis.index');
+                Route::post('cfdis/{cfdi}/accounting-journal', [SatCfdiController::class, 'generateAccountingJournal'])
+                    ->name('cfdis.accounting-journal');
                 Route::get('cfdis/{cfdi}', [SatCfdiController::class, 'show'])->name('cfdis.show');
                 Route::get('cfdis/{cfdi}/json', [SatCfdiController::class, 'json'])->name('cfdis.json');
 

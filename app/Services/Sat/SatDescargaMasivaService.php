@@ -7,6 +7,7 @@ use App\Models\SatCfdi;
 use App\Models\SatCfdiConcepto;
 use App\Models\SatCfdiPago;
 use App\Models\SatDownloadRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpCfdi\Credentials\Credential;
@@ -23,6 +24,42 @@ use PhpCfdi\SatWsDescargaMasiva\Shared\DocumentStatus;
 
 class SatDescargaMasivaService
 {
+    /**
+     * Reprocesa un CFDI ya guardado en storage, sin llamar al SAT.
+     */
+    public function reprocessStoredCfdi(SatCfdi $cfdi): bool
+    {
+        if (! $cfdi->xml_path || ! Storage::exists($cfdi->xml_path)) {
+            Log::warning('XML CFDI no encontrado para reproceso', [
+                'cfdi_id' => $cfdi->id,
+                'uuid' => $cfdi->uuid,
+                'xml_path' => $cfdi->xml_path,
+            ]);
+
+            return false;
+        }
+
+        try {
+            $xmlContent = Storage::get($cfdi->xml_path);
+            $xml = new \SimpleXMLElement($xmlContent);
+
+            DB::transaction(function () use ($cfdi, $xml) {
+                $this->processConceptos($cfdi, $xml);
+            });
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Error reprocesando CFDI guardado', [
+                'cfdi_id' => $cfdi->id,
+                'uuid' => $cfdi->uuid,
+                'xml_path' => $cfdi->xml_path,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
     /**
      * Construye el Service del SAT usando la FIEL del customer
      */
@@ -524,11 +561,34 @@ private function processConceptos(SatCfdi $cfdi, \SimpleXMLElement $xml): void
         return;
     }
 
+    $cfdi->conceptos()->delete();
+
+    $totalIvaTrasladado = 0.0;
+    $totalRetenciones = 0.0;
+    $hasTraslados = false;
+    $hasRetenciones = false;
+
     foreach ($conceptoNodes as $conceptoNode) {
 
         try {
 
             $attrs = $conceptoNode->attributes();
+            $impuestos = $this->extractImpuestosConcepto($conceptoNode);
+
+            $ivaTrasladado = $this->sumImpuestos($impuestos['traslados'] ?? [], '002');
+            $ivaRetenido = $this->sumImpuestos($impuestos['retenciones'] ?? [], '002');
+            $isrRetenido = $this->sumImpuestos($impuestos['retenciones'] ?? [], '001');
+
+            if (! empty($impuestos['traslados'])) {
+                $hasTraslados = true;
+            }
+
+            if (! empty($impuestos['retenciones'])) {
+                $hasRetenciones = true;
+            }
+
+            $totalIvaTrasladado += $ivaTrasladado;
+            $totalRetenciones += $ivaRetenido + $isrRetenido;
 
             $cfdi->conceptos()->create([
 
@@ -551,6 +611,14 @@ private function processConceptos(SatCfdi $cfdi, \SimpleXMLElement $xml): void
                 'descuento' => $this->xmlAttr($attrs, ['Descuento', 'descuento']),
 
                 'objeto_impuesto' => $this->xmlAttr($attrs, ['ObjetoImp', 'objetoimp']),
+
+                'importe_iva_trasladado' => $ivaTrasladado ?: null,
+
+                'importe_iva_retenido' => $ivaRetenido ?: null,
+
+                'importe_isr_retenido' => $isrRetenido ?: null,
+
+                'impuestos_json' => $impuestos,
             ]);
 
         } catch (\Throwable $e) {
@@ -563,6 +631,13 @@ private function processConceptos(SatCfdi $cfdi, \SimpleXMLElement $xml): void
             ]);
         }
     }
+
+    $totalesXml = $this->extractTotalesImpuestosCfdi($xml);
+
+    $cfdi->update([
+        'total_impuestos_trasladados' => $totalesXml['trasladados'] ?? ($hasTraslados ? $totalIvaTrasladado : null),
+        'total_impuestos_retenidos' => $totalesXml['retenidos'] ?? ($hasRetenciones ? $totalRetenciones : null),
+    ]);
 }
 
     /**
@@ -613,32 +688,59 @@ private function processConceptos(SatCfdi $cfdi, \SimpleXMLElement $xml): void
      */
     private function extractImpuestosConcepto(\SimpleXMLElement $concepto): ?array
     {
-        $impuestos = $concepto->{'Impuestos'} ?? null;
-        if (! $impuestos) return null;
-
         $result = [];
 
-        foreach ($impuestos->{'Traslados'}->{'Traslado'} ?? [] as $traslado) {
+        $traslados = $concepto->xpath('*[local-name()="Impuestos"]/*[local-name()="Traslados"]/*[local-name()="Traslado"]') ?: [];
+
+        foreach ($traslados as $traslado) {
+            $attrs = $traslado->attributes();
+
             $result['traslados'][] = [
-                'base'       => (string) $traslado->attributes()['Base'],
-                'impuesto'   => (string) $traslado->attributes()['Impuesto'],
-                'tipo_factor'=> (string) $traslado->attributes()['TipoFactor'],
-                'tasa'       => (string) $traslado->attributes()['TasaOCuota'],
-                'importe'    => (string) $traslado->attributes()['Importe'],
+                'base'       => $this->xmlAttr($attrs, ['Base', 'base']),
+                'impuesto'   => $this->xmlAttr($attrs, ['Impuesto', 'impuesto']),
+                'tipo_factor'=> $this->xmlAttr($attrs, ['TipoFactor', 'tipofactor']),
+                'tasa'       => $this->xmlAttr($attrs, ['TasaOCuota', 'tasaocuota']),
+                'importe'    => $this->xmlAttr($attrs, ['Importe', 'importe']),
             ];
         }
 
-        foreach ($impuestos->{'Retenciones'}->{'Retencion'} ?? [] as $retencion) {
+        $retenciones = $concepto->xpath('*[local-name()="Impuestos"]/*[local-name()="Retenciones"]/*[local-name()="Retencion"]') ?: [];
+
+        foreach ($retenciones as $retencion) {
+            $attrs = $retencion->attributes();
+
             $result['retenciones'][] = [
-                'base'       => (string) $retencion->attributes()['Base'],
-                'impuesto'   => (string) $retencion->attributes()['Impuesto'],
-                'tipo_factor'=> (string) $retencion->attributes()['TipoFactor'],
-                'tasa'       => (string) $retencion->attributes()['TasaOCuota'],
-                'importe'    => (string) $retencion->attributes()['Importe'],
+                'base'       => $this->xmlAttr($attrs, ['Base', 'base']),
+                'impuesto'   => $this->xmlAttr($attrs, ['Impuesto', 'impuesto']),
+                'tipo_factor'=> $this->xmlAttr($attrs, ['TipoFactor', 'tipofactor']),
+                'tasa'       => $this->xmlAttr($attrs, ['TasaOCuota', 'tasaocuota']),
+                'importe'    => $this->xmlAttr($attrs, ['Importe', 'importe']),
             ];
         }
 
         return $result ?: null;
+    }
+
+    private function extractTotalesImpuestosCfdi(\SimpleXMLElement $xml): array
+    {
+        $impuestosNodes = $xml->xpath('/*[local-name()="Comprobante"]/*[local-name()="Impuestos"]') ?: [];
+        $attrs = $impuestosNodes ? $impuestosNodes[0]->attributes() : null;
+
+        return [
+            'trasladados' => $this->xmlAttr($attrs, ['TotalImpuestosTrasladados', 'totalimpuestostrasladados']),
+            'retenidos' => $this->xmlAttr($attrs, ['TotalImpuestosRetenidos', 'totalimpuestosretenidos']),
+        ];
+    }
+
+    private function sumImpuestos(array $impuestos, string $codigo): float
+    {
+        return array_reduce($impuestos, function (float $total, array $impuesto) use ($codigo) {
+            if (($impuesto['impuesto'] ?? null) !== $codigo) {
+                return $total;
+            }
+
+            return $total + (float) ($impuesto['importe'] ?? 0);
+        }, 0.0);
     }
     private function xmlAttr($attributes, array $keys): ?string
 {

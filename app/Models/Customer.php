@@ -56,4 +56,19 @@ class Customer extends Model
     {
         return $this->hasMany(SatCfdi::class);
     }
+
+    public function accountingAccounts()
+    {
+        return $this->hasMany(AccountingAccount::class);
+    }
+
+    public function accountingJournals()
+    {
+        return $this->hasMany(AccountingJournal::class);
+    }
+
+    public function accountingThirdParties()
+    {
+        return $this->hasMany(AccountingThirdParty::class);
+    }
 }

@@ -92,6 +92,11 @@ class SatCfdi extends Model
         return $this->hasMany(SatCfdiPago::class);
     }
 
+    public function journalEntries()
+    {
+        return $this->hasMany(AccountingJournalEntry::class);
+    }
+
     // Scopes para dashboard
     public function scopeVigentes($query)
     {

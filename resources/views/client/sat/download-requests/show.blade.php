@@ -330,6 +330,29 @@
                             </thead>
                             <tbody class="divide-y divide-gray-100">
                                 @foreach($downloadRequest->cfdis as $cfdi)
+                                    @php
+                                        $journalEntry = $cfdi->journalEntries->first();
+                                        $journal = $journalEntry?->journal;
+                                        $canGenerateJournal = $cfdi->estado_sat === 'vigente'
+                                            && $cfdi->tipo_comprobante === 'I'
+                                            && ! $journal;
+                                        $isIssuedByCustomer = strtoupper((string) $cfdi->rfc_emisor) === strtoupper((string) $downloadRequest->customer->rfc)
+                                            || $cfdi->tipo_descarga === 'emitidas';
+                                        $counterpartyRfc = strtoupper((string) ($isIssuedByCustomer ? $cfdi->rfc_receptor : $cfdi->rfc_emisor));
+                                        $counterpartyName = $isIssuedByCustomer ? $cfdi->razon_social_receptor : $cfdi->razon_social_emisor;
+                                        $thirdParty = $thirdPartiesByKey->get($cfdi->customer_id . '|' . $counterpartyRfc);
+                                        $hasThirdPartyAccount = $thirdParty?->default_account_id;
+                                        $accountsForPrompt = ($accountingAccountsByCustomer->get($cfdi->customer_id) ?? collect())
+                                            ->map(fn ($account) => ['id' => $account->id, 'label' => $account->code . ' - ' . $account->name])
+                                            ->values();
+                                        $journalPrompt = [
+                                            'action' => route('client.sat.cfdis.accounting-journal', $cfdi),
+                                            'rfc' => $counterpartyRfc,
+                                            'name' => $counterpartyName ?: 'Sin razon social',
+                                            'type' => $isIssuedByCustomer ? 'cliente' : 'proveedor',
+                                            'accounts' => $accountsForPrompt,
+                                        ];
+                                    @endphp
                                     <tr class="hover:bg-gray-50">
                                         <td class="px-6 py-3 text-gray-700">
                                             {{ $cfdi->fecha_emision?->format('d/m/Y') ?? '—' }}
@@ -350,6 +373,30 @@
                                             </span>
                                         </td>
                                         <td class="px-6 py-3">
+                                            <div class="flex flex-wrap gap-2">
+                                                @if($journal)
+                                                    <span class="inline-flex items-center px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-semibold"
+                                                          title="{{ $journal->number }}">
+                                                        Poliza {{ $journal->status === 'posted' ? 'contabilizada' : 'borrador' }}
+                                                    </span>
+                                                @elseif($canGenerateJournal)
+                                                    @if($hasThirdPartyAccount)
+                                                        <form method="POST" action="{{ route('client.sat.cfdis.accounting-journal', $cfdi) }}">
+                                                            @csrf
+                                                            <button class="inline-flex items-center px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100">
+                                                                Generar poliza
+                                                            </button>
+                                                        </form>
+                                                    @else
+                                                        <button type="button"
+                                                                @click="openJournalAccountPrompt(JSON.parse($el.nextElementSibling.textContent))"
+                                                                class="inline-flex items-center px-3 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-xs font-semibold hover:bg-amber-100">
+                                                            Generar poliza
+                                                        </button>
+                                                        <script type="application/json">@json($journalPrompt)</script>
+                                                    @endif
+                                                @endif
+
                                                 <button
                                                     type="button"
                                                     @click="show({{ $cfdi->id }})"
@@ -358,13 +405,69 @@
                                                     👁 Ver
                                                 </button>
 
-                                            </td>
+                                            </div>
+                                        </td>
                                             
 
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
+
+<div x-show="journalPrompt.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div @click.away="journalPrompt.open = false" class="bg-white rounded-2xl shadow-2xl w-full max-w-xl">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-start justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-bold text-gray-900">Asignar cuenta al tercero</h2>
+                <p class="mt-1 text-sm text-gray-500">
+                    Este <span x-text="journalPrompt.type"></span> no tiene cuenta default.
+                </p>
+            </div>
+            <button @click="journalPrompt.open = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+
+        <div class="p-6 space-y-5">
+            <div class="rounded-lg border border-gray-200 p-4">
+                <p class="text-xs font-bold text-gray-400 uppercase">RFC</p>
+                <p class="mt-1 font-mono font-semibold text-gray-900" x-text="journalPrompt.rfc"></p>
+                <p class="mt-1 text-sm text-gray-600" x-text="journalPrompt.name"></p>
+            </div>
+
+            <form method="POST" :action="journalPrompt.action" class="space-y-4">
+                @csrf
+                <input type="hidden" name="save_third_party" value="1">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Cuenta default</label>
+                    <select name="default_account_id" required class="w-full rounded-lg border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Seleccionar cuenta</option>
+                        <template x-for="account in journalPrompt.accounts" :key="account.id">
+                            <option :value="account.id" x-text="account.label"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                    <button type="button"
+                            @click="journalPrompt.open = false"
+                            class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700">
+                        Asignar y generar
+                    </button>
+                </div>
+            </form>
+
+            <form method="POST" :action="journalPrompt.action" class="border-t border-gray-100 pt-4">
+                @csrf
+                <button class="text-xs font-semibold text-gray-500 hover:text-gray-900">
+                    Generar solo esta vez con cuenta default
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
                         
 <!-- MODAL CFDI -->
 <div
@@ -558,6 +661,25 @@ function cfdiModal() {
         open: false,
         loading: false,
         cfdi: null,
+        journalPrompt: {
+            open: false,
+            action: '',
+            rfc: '',
+            name: '',
+            type: '',
+            accounts: []
+        },
+
+        openJournalAccountPrompt(data) {
+            this.journalPrompt = {
+                open: true,
+                action: data.action,
+                rfc: data.rfc,
+                name: data.name,
+                type: data.type,
+                accounts: data.accounts || []
+            };
+        },
 
         async show(id) {
             this.open = true;

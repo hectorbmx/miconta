@@ -35,15 +35,24 @@ class CustomerPlanController extends Controller
      */
 public function store(Request $request, StripeCustomerPlanService $stripeService)
 {
+    $tenant = auth()->user()->tenant;
+
     $validated = $request->validate([
         'name' => ['required', 'string', 'max:255'],
         'price' => ['required', 'numeric', 'min:0'],
         'billing_period' => ['required', 'in:monthly,yearly,one_time'],
+        'billing_mode' => ['required', 'in:manual,stripe'],
         'duration_days' => ['nullable', 'integer', 'min:1'],
         'max_downloads' => ['nullable', 'integer', 'min:0'],
         'max_companies' => ['nullable', 'integer', 'min:0'],
         'description' => ['nullable', 'string'],
     ]);
+
+    if ($validated['billing_mode'] === 'stripe' && (! $tenant || ! $tenant->stripe_account_id || ! $tenant->stripe_charges_enabled)) {
+        return back()
+            ->withInput()
+            ->with('error', 'Conecta Stripe antes de crear planes con cobro automatico. Puedes crear este plan como manual.');
+    }
 
     $validated['tenant_id'] = auth()->user()->tenant_id;
     $validated['slug'] = Str::slug($validated['name']);
@@ -51,11 +60,15 @@ public function store(Request $request, StripeCustomerPlanService $stripeService
 
     $plan = CustomerPlan::create($validated);
 
-    $stripeService->createProductAndPrice($plan);
+    if ($plan->billing_mode === 'stripe') {
+        $stripeService->createProductAndPrice($plan);
+    }
 
     return redirect()
         ->route('client.customer-plans.index')
-        ->with('success', 'Plan creado y sincronizado con Stripe.');
+        ->with('success', $plan->billing_mode === 'stripe'
+            ? 'Plan creado y sincronizado con Stripe.'
+            : 'Plan manual creado correctamente.');
 }
 
     /**

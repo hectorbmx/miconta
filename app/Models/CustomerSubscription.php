@@ -16,13 +16,19 @@ class CustomerSubscription extends Model
         'customer_id',
         'customer_plan_id',
         'status',
+        'billing_mode',
         'starts_at',
         'ends_at',
         'price_snapshot',
         'stripe_checkout_session_id',
         'stripe_subscription_id',
         'stripe_payment_status',
+        'payment_status',
         'paid_at',
+        'payment_method',
+        'paid_amount',
+        'payment_reference',
+        'payment_notes',
         'max_downloads_snapshot',
         'max_companies_snapshot',
     ];
@@ -31,6 +37,8 @@ class CustomerSubscription extends Model
         'starts_at' => 'date',
         'ends_at' => 'date',
         'price_snapshot' => 'decimal:2',
+        'paid_at' => 'datetime',
+        'paid_amount' => 'decimal:2',
     ];
 
     /*

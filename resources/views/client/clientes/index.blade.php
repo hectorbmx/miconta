@@ -4,12 +4,25 @@
         selectedCustomerId: null,
         selectedCustomerName: '',
         assignAction: '',
+        openPaymentModal: false,
+        paymentAction: '',
+        paymentCustomerName: '',
+        paymentPlanName: '',
+        paymentAmount: '',
 
         openModal(customerId, customerName) {
             this.selectedCustomerId = customerId;
             this.selectedCustomerName = customerName;
             this.assignAction = `/client/clientes/${customerId}/assign-plan`;
             this.openAssignPlan = true;
+        },
+
+        openPayment(customerId, subscriptionId, customerName, planName, amount) {
+            this.paymentCustomerName = customerName;
+            this.paymentPlanName = planName;
+            this.paymentAmount = amount;
+            this.paymentAction = `/client/clientes/${customerId}/subscriptions/${subscriptionId}/manual-payment`;
+            this.openPaymentModal = true;
         }
     }">
 
@@ -93,7 +106,7 @@
                             <span class="inline-flex px-2 py-1 text-xs rounded-full bg-red-100 text-red-700">
                                 Vencido
                             </span>
-                        @elseif($sub->stripe_payment_status === 'paid')
+                        @elseif(($sub->payment_status ?? null) === 'paid' || $sub->stripe_payment_status === 'paid')
                             <span class="inline-flex px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
                                 Pagado
                             </span>
@@ -103,7 +116,23 @@
                             </span>
                         @endif
 
-                        @if($plan?->stripe_price_id)
+                        @if(($sub->billing_mode ?? $plan?->billing_mode) === 'manual')
+                            <div class="mt-2 text-xs text-slate-500">
+                                Cobro manual
+                            </div>
+
+                            @if(($sub->payment_status ?? 'pending') !== 'paid')
+                                <button type="button"
+                                        @click="openPayment({{ $cliente->id }}, {{ $sub->id }}, '{{ addslashes($cliente->razon_social) }}', '{{ addslashes($plan?->name ?? 'Plan') }}', '{{ $sub->price_snapshot }}')"
+                                        class="mt-2 text-xs px-3 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+                                    Registrar pago
+                                </button>
+                            @elseif($sub->paid_at)
+                                <div class="mt-1 text-xs text-emerald-600">
+                                    {{ $sub->paid_at->format('d/m/Y') }}
+                                </div>
+                            @endif
+                        @elseif($plan?->stripe_price_id)
                             <div class="mt-1 text-xs text-emerald-600">
                                 Stripe sincronizado
                             </div>
@@ -156,6 +185,11 @@
                         <a href="{{ route('client.clientes.show', $cliente->id) }}"
                            class="text-blue-600 hover:text-blue-800 font-medium">
                             Ver
+                        </a>
+
+                        <a href="{{ route('client.clientes.accounting-journals.index', $cliente) }}"
+                           class="text-emerald-600 hover:text-emerald-800 font-medium">
+                            Polizas
                         </a>
                     </div>
                 </td>
@@ -307,6 +341,107 @@
                 <button type="submit"
                         class="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700">
                     Asignar plan
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+    {{-- MODAL REGISTRAR PAGO MANUAL --}}
+<div x-show="openPaymentModal"
+     x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+
+    <div @click.away="openPaymentModal = false"
+         class="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">
+                    Registrar pago manual
+                </h3>
+                <p class="text-sm text-gray-500">
+                    <span x-text="paymentCustomerName"></span> · <span x-text="paymentPlanName"></span>
+                </p>
+            </div>
+
+            <button type="button"
+                    @click="openPaymentModal = false"
+                    class="text-gray-400 hover:text-gray-600 text-2xl leading-none">
+                &times;
+            </button>
+        </div>
+
+        <form method="POST" :action="paymentAction" class="p-6 space-y-4">
+            @csrf
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Monto pagado
+                </label>
+                <input type="number"
+                       step="0.01"
+                       min="0"
+                       name="paid_amount"
+                       x-model="paymentAmount"
+                       required
+                       class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Fecha de pago
+                </label>
+                <input type="date"
+                       name="paid_at"
+                       value="{{ now()->toDateString() }}"
+                       required
+                       class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Metodo de pago
+                </label>
+                <select name="payment_method"
+                        required
+                        class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    <option value="transfer">Transferencia</option>
+                    <option value="cash">Efectivo</option>
+                    <option value="deposit">Deposito</option>
+                    <option value="card_external">Tarjeta externa</option>
+                    <option value="other">Otro</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Referencia
+                </label>
+                <input type="text"
+                       name="payment_reference"
+                       placeholder="Folio, SPEI, nota o referencia"
+                       class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Notas
+                </label>
+                <textarea name="payment_notes"
+                          rows="3"
+                          class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-4">
+                <button type="button"
+                        @click="openPaymentModal = false"
+                        class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
+                    Cancelar
+                </button>
+
+                <button type="submit"
+                        class="px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700">
+                    Guardar pago
                 </button>
             </div>
         </form>

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Client\Sat;
 
 use App\Http\Controllers\Controller;
+use App\Models\AccountingAccount;
+use App\Models\AccountingThirdParty;
 use App\Models\Customer;
 use App\Models\SatDownloadRequest;
 use App\Services\Sat\SatDescargaMasivaService;
@@ -87,6 +89,8 @@ class SatDownloadRequestController extends Controller
 
     // Cargamos la solicitud y filtramos los CFDIs relacionados
     $downloadRequest->load(['customer', 'cfdis' => function ($query) use ($request) {
+        $query->with('journalEntries.journal');
+
         
         // Filtro por RFC (Emisor o Receptor)
         if ($request->filled('rfc')) {
@@ -112,7 +116,9 @@ class SatDownloadRequestController extends Controller
         return $query->latest('fecha_emision');
     }]);
 
-    return view('client.sat.download-requests.show', compact('downloadRequest'));
+    [$accountingAccountsByCustomer, $thirdPartiesByKey] = $this->accountingPromptData($downloadRequest->cfdis);
+
+    return view('client.sat.download-requests.show', compact('downloadRequest', 'accountingAccountsByCustomer', 'thirdPartiesByKey'));
 }
 
     /**
@@ -147,5 +153,30 @@ class SatDownloadRequestController extends Controller
             $downloadRequest->customer->tenant_id === auth()->user()->tenant_id,
             403
         );
+    }
+
+    private function accountingPromptData($cfdis): array
+    {
+        $customerIds = $cfdis->pluck('customer_id')->unique()->values();
+        $rfcs = $cfdis
+            ->flatMap(fn ($cfdi) => [strtoupper((string) $cfdi->rfc_emisor), strtoupper((string) $cfdi->rfc_receptor)])
+            ->filter()
+            ->unique()
+            ->values();
+
+        $accounts = AccountingAccount::where('tenant_id', auth()->user()->tenant_id)
+            ->whereIn('customer_id', $customerIds)
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get()
+            ->groupBy('customer_id');
+
+        $thirdParties = AccountingThirdParty::where('tenant_id', auth()->user()->tenant_id)
+            ->whereIn('customer_id', $customerIds)
+            ->whereIn('rfc', $rfcs)
+            ->get()
+            ->keyBy(fn ($thirdParty) => $thirdParty->customer_id . '|' . strtoupper($thirdParty->rfc));
+
+        return [$accounts, $thirdParties];
     }
 }

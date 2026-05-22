@@ -12,6 +12,8 @@
     use Illuminate\Support\Facades\Mail;
     use Illuminate\Support\Facades\Storage;
     use App\Models\SatCsfRequest;
+    use App\Models\AccountingJournal;
+    use App\Services\Sat\MonthlyTaxSummaryService;
 
     class ClienteController extends Controller
     {
@@ -21,6 +23,7 @@
     public function index()
     {
         $clientes = Customer::with('activeSubscription.plan')
+            ->withCount('accountingJournals')
             ->where('tenant_id', auth()->user()->tenant_id)
             ->latest()
             ->paginate(10);
@@ -69,20 +72,43 @@
         /**
          * Ver cliente
          */
-   public function show(Customer $customer)
+   public function show(Request $request, Customer $customer, MonthlyTaxSummaryService $monthlyTaxSummary)
     {
         $this->authorizeTenant($customer);
 
-        $customer->load(['satDownloadRequests', 'satCfdis']);
+        $customer->load([
+            'satDownloadRequests',
+            'satCfdis',
+            'accountingAccounts' => fn ($query) => $query->orderBy('code'),
+        ]);
+        $selectedMonth = $request->input(
+            'month',
+            optional($customer->satCfdis->max('fecha_emision'))->format('Y-m') ?? now()->format('Y-m')
+        );
+
+        $taxSummary = $monthlyTaxSummary->forCustomer($customer, $selectedMonth);
+
         $csfRequests = SatCsfRequest::where('customer_id', $customer->id)
         ->latest()
         ->take(10)
         ->get();
 
+        $journalStatsBase = AccountingJournal::where('tenant_id', auth()->user()->tenant_id)
+            ->where('customer_id', $customer->id);
+
+        $accountingJournalStats = [
+            'total' => (clone $journalStatsBase)->count(),
+            'draft' => (clone $journalStatsBase)->where('status', 'draft')->count(),
+            'posted' => (clone $journalStatsBase)->where('status', 'posted')->count(),
+        ];
+
         return view('client.clientes.show', [
             'customer' => $customer,
             'cliente'  => $customer,
             'csfRequests' => $csfRequests,
+            'selectedMonth' => $selectedMonth,
+            'taxSummary' => $taxSummary,
+            'accountingJournalStats' => $accountingJournalStats,
 
         ]);
     }
@@ -206,10 +232,13 @@
                 ->where('is_active', true)
                 ->findOrFail($validated['customer_plan_id']);
 
-            // Cancelar suscripción activa anterior si existía
-            CustomerSubscription::where('tenant_id', auth()->user()->tenant_id)
+            $activeSubscriptionIds = CustomerSubscription::where('tenant_id', auth()->user()->tenant_id)
                 ->where('customer_id', $customer->id)
                 ->where('status', 'active')
+                ->pluck('id');
+
+            // Cancelar suscripción activa anterior si existía
+            CustomerSubscription::whereIn('id', $activeSubscriptionIds)
                 ->update(['status' => 'canceled']);
 
             $startsAt = Carbon::parse($validated['starts_at']);
@@ -224,29 +253,33 @@
                 'customer_id' => $customer->id,
                 'customer_plan_id' => $plan->id,
                 'status' => 'active',
+                'billing_mode' => $plan->billing_mode ?? 'manual',
+                'payment_status' => (($plan->billing_mode ?? 'manual') === 'manual' || ! $plan->stripe_price_id) ? 'pending' : 'pending',
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
                 'price_snapshot' => $plan->price,
                 'max_downloads_snapshot' => $plan->max_downloads,
                 'max_companies_snapshot' => $plan->max_companies,
             ]);
-            // $stripe = new StripeClient(config('services.stripe.secret'));
-            // $payment = auth()->user()->tenant->paymentSetting;
 
-            // if (!$payment || !$payment->is_active || !$payment->stripe_secret_key) {
-            //         return back()->with('error', 'Configura tu cuenta de Stripe primero.');
-            //     }
+            if (($plan->billing_mode ?? 'manual') === 'manual' || ! $plan->stripe_price_id) {
+                return redirect()
+                    ->route('client.clientes.index')
+                    ->with('success', 'Plan manual asignado correctamente.');
+            }
 
-            //     $stripe = new StripeClient($payment->stripe_secret_key);
             $tenant = auth()->user()->tenant;
 
     if (!$tenant || !$tenant->stripe_account_id || !$tenant->stripe_charges_enabled) {
-        return back()->with('error', 'Configura o completa tu cuenta de Stripe primero.');
+        $subscription->update(['status' => 'canceled']);
+        CustomerSubscription::whereIn('id', $activeSubscriptionIds)->update(['status' => 'active']);
+
+        return back()->with('error', 'Configura o completa tu cuenta de Stripe primero, o asigna un plan manual.');
     }
 
     $stripe = new StripeClient(config('services.stripe.secret'));
 
-                if ($plan->stripe_price_id && $customer->email) {
+                if ($customer->email) {
 
                 //    $session = $stripe->checkout->sessions->create([
                 //         'mode' => 'subscription',
@@ -299,10 +332,43 @@
                         $message->to($customer->email)
                                 ->subject('Completa tu pago');
                     });
+                } else {
+                    $subscription->update(['status' => 'canceled']);
+                    CustomerSubscription::whereIn('id', $activeSubscriptionIds)->update(['status' => 'active']);
+
+                    return back()->with('error', 'El cliente necesita email para enviar el checkout de Stripe.');
                 }
 
             return redirect()
                 ->route('client.clientes.index')
                 ->with('success', 'Plan asignado correctamente.');
+        }
+
+        public function registerManualPayment(Request $request, Customer $customer, CustomerSubscription $subscription)
+        {
+            abort_if($customer->tenant_id !== auth()->user()->tenant_id, 403);
+            abort_if($subscription->tenant_id !== auth()->user()->tenant_id || $subscription->customer_id !== $customer->id, 403);
+            abort_if($subscription->billing_mode !== 'manual', 422, 'Solo se pueden registrar pagos manuales en suscripciones manuales.');
+
+            $validated = $request->validate([
+                'paid_amount' => ['required', 'numeric', 'min:0'],
+                'paid_at' => ['required', 'date'],
+                'payment_method' => ['required', 'in:cash,transfer,deposit,card_external,other'],
+                'payment_reference' => ['nullable', 'string', 'max:255'],
+                'payment_notes' => ['nullable', 'string', 'max:2000'],
+            ]);
+
+            $subscription->update([
+                'payment_status' => 'paid',
+                'paid_amount' => $validated['paid_amount'],
+                'paid_at' => Carbon::parse($validated['paid_at']),
+                'payment_method' => $validated['payment_method'],
+                'payment_reference' => $validated['payment_reference'] ?? null,
+                'payment_notes' => $validated['payment_notes'] ?? null,
+            ]);
+
+            return redirect()
+                ->route('client.clientes.index')
+                ->with('success', 'Pago manual registrado correctamente.');
         }
     }
