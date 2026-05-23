@@ -11,6 +11,7 @@
     use Stripe\StripeClient;
     use Illuminate\Support\Facades\Mail;
     use Illuminate\Support\Facades\Storage;
+    use App\Models\SatComplianceOpinionRequest;
     use App\Models\SatCsfRequest;
     use App\Models\AccountingJournal;
     use App\Services\Sat\MonthlyTaxSummaryService;
@@ -105,6 +106,11 @@
         ->take(10)
         ->get();
 
+        $complianceOpinionRequests = SatComplianceOpinionRequest::where('customer_id', $customer->id)
+        ->latest()
+        ->take(10)
+        ->get();
+
         $journalStatsBase = AccountingJournal::where('tenant_id', auth()->user()->tenant_id)
             ->where('customer_id', $customer->id);
 
@@ -118,6 +124,7 @@
             'customer' => $customer,
             'cliente'  => $customer,
             'csfRequests' => $csfRequests,
+            'complianceOpinionRequests' => $complianceOpinionRequests,
             'selectedMonth' => $selectedMonth,
             'taxSummary' => $taxSummary,
             'accountingJournalStats' => $accountingJournalStats,

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ab9e9e14c5089e7ab9f6774b637a956e",
+    "content-hash": "ab27ddd859336284a26de4f4746739b6",
     "packages": [
         {
             "name": "ankane/onnxruntime",
@@ -3037,6 +3037,58 @@
                 "source": "https://github.com/phpcfdi/image-captcha-resolver-boxfactura-ai"
             },
             "time": "2025-09-13T21:09:22+00:00"
+        },
+        {
+            "name": "phpcfdi/opinion-cumplimiento-sat-scraper",
+            "version": "v0.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpcfdi/opinion-cumplimiento-sat-scraper.git",
+                "reference": "0da7faab30c366a2871ac015381c724466395009"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpcfdi/opinion-cumplimiento-sat-scraper/zipball/0da7faab30c366a2871ac015381c724466395009",
+                "reference": "0da7faab30c366a2871ac015381c724466395009",
+                "shasum": ""
+            },
+            "require": {
+                "ext-curl": "*",
+                "guzzlehttp/guzzle": "^7.10",
+                "php": ">=8.2",
+                "phpcfdi/image-captcha-resolver": "^0.3.0",
+                "symfony/css-selector": "^7.4 || ^8.0",
+                "symfony/dom-crawler": "^7.4 || ^8.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^11.5"
+            },
+            "suggest": {
+                "phpcfdi/image-captcha-resolver-boxfactura-ai": "Allow the use of BoxFacturaAI Captcha Resolver"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "PhpCfdi\\OpinionCumplimientoSatScraper\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Cesar Aguilera",
+                    "email": "cesargnu29@gmail.com"
+                }
+            ],
+            "description": "Scraper para descargar la Opinión de Cumplimiento del SAT México",
+            "homepage": "https://github.com/phpcfdi/opinion-cumplimiento-sat-scraper",
+            "support": {
+                "issues": "https://github.com/phpcfdi/opinion-cumplimiento-sat-scraper/issues",
+                "source": "https://github.com/phpcfdi/opinion-cumplimiento-sat-scraper"
+            },
+            "time": "2026-04-06T23:45:41+00:00"
         },
         {
             "name": "phpcfdi/rfc",

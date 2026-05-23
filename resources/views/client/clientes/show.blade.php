@@ -1022,6 +1022,109 @@
         </table>
     </div>
 </div>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
+    <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+        <div>
+            <h2 class="text-lg font-bold text-slate-900">
+                Opiniones de cumplimiento 32-D
+            </h2>
+            <p class="text-sm text-slate-500">
+                Historial de opiniones de cumplimiento descargadas desde el SAT para este cliente.
+            </p>
+        </div>
+
+        <div x-data="{ loading: false }">
+            <form method="POST"
+                  action="{{ route('client.sat.compliance-opinions.store', $customer) }}"
+                  @submit="loading = true">
+                @csrf
+                <button type="submit"
+                        class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors">
+                    Descargar 32-D
+                </button>
+            </form>
+
+            <div x-show="loading"
+                 class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60"
+                 style="display: none;">
+                <div class="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-emerald-600 mb-4"></div>
+                    <h2 class="text-lg font-bold text-gray-800">Conectando al SAT</h2>
+                    <p class="text-sm text-gray-500">Estamos descargando la opinión 32-D, esto puede tardar unos segundos.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr class="text-left text-xs font-bold text-slate-500 uppercase">
+                    <th class="px-6 py-3">RFC</th>
+                    <th class="px-6 py-3">Fecha</th>
+                    <th class="px-6 py-3">Estado</th>
+                    <th class="px-6 py-3">Error</th>
+                    <th class="px-6 py-3 text-right">Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody class="divide-y divide-slate-100">
+                @forelse($complianceOpinionRequests ?? [] as $opinion)
+                    <tr>
+                        <td class="px-6 py-4 font-medium text-slate-900">
+                            {{ $opinion->rfc }}
+                        </td>
+
+                        <td class="px-6 py-4 text-slate-600">
+                            {{ $opinion->downloaded_at?->format('d/m/Y H:i') ?? $opinion->created_at->format('d/m/Y H:i') }}
+                        </td>
+
+                        <td class="px-6 py-4">
+                            @php
+                                $opinionClasses = [
+                                    'pending'     => 'bg-gray-100 text-gray-700',
+                                    'downloading' => 'bg-blue-100 text-blue-700',
+                                    'completed'   => 'bg-green-100 text-green-700',
+                                    'failed'      => 'bg-red-100 text-red-700',
+                                ];
+
+                                $opinionLabels = [
+                                    'pending'     => 'Pendiente',
+                                    'downloading' => 'Descargando',
+                                    'completed'   => 'Completada',
+                                    'failed'      => 'Error',
+                                ];
+                            @endphp
+
+                            <span class="px-3 py-1 rounded-full text-xs font-bold {{ $opinionClasses[$opinion->estado] ?? 'bg-gray-100 text-gray-700' }}">
+                                {{ $opinionLabels[$opinion->estado] ?? $opinion->estado }}
+                            </span>
+                        </td>
+
+                        <td class="px-6 py-4 text-red-500 text-xs">
+                            {{ $opinion->error_message ? Str::limit($opinion->error_message, 80) : '-' }}
+                        </td>
+
+                        <td class="px-6 py-4 text-right space-x-2">
+                            @if($opinion->pdf_path)
+                                <a href="{{ route('client.sat.compliance-opinions.download-pdf', [$customer, $opinion]) }}"
+                                   class="inline-flex px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800">
+                                    PDF
+                                </a>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-slate-500">
+                            Aun no hay opiniones 32-D descargadas.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
     {{-- MODAL NUEVA SOLICITUD --}}
     <x-modal name="nueva-solicitud" :show="false">
         <div class="p-6">

@@ -22,6 +22,7 @@ use App\Http\Controllers\Client\Sat\SatCfdiController;
 
 use App\Http\Controllers\Client\Sat\CsfController;
 use App\Http\Controllers\Client\Sat\SatCsfRequestController;
+use App\Http\Controllers\Client\Sat\SatComplianceOpinionRequestController;
 
 
 
@@ -203,6 +204,9 @@ Route::middleware(['auth', 'verified'])
                 Route::post('customers/{customer}/csf',[SatCsfRequestController::class, 'store'])->name('csf.store');
                 Route::get('customers/{customer}/csf/{satCsfRequest}',[SatCsfRequestController::class, 'show'])->name('csf.show');
                 Route::get('customers/{customer}/csf/{satCsfRequest}/download-pdf',[SatCsfRequestController::class, 'downloadPdf'])->name('csf.download-pdf');
+                Route::get('customers/{customer}/compliance-opinions', [SatComplianceOpinionRequestController::class, 'index'])->name('compliance-opinions.index');
+                Route::post('customers/{customer}/compliance-opinions', [SatComplianceOpinionRequestController::class, 'store'])->name('compliance-opinions.store');
+                Route::get('customers/{customer}/compliance-opinions/{satComplianceOpinionRequest}/download-pdf', [SatComplianceOpinionRequestController::class, 'downloadPdf'])->name('compliance-opinions.download-pdf');
 
 
             });
