@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Password;
+use App\Services\Stripe\TenantStripeBillingService;
 
 
 class TenantController extends Controller
@@ -48,24 +49,30 @@ public function index()
      */
 public function store(Request $request)
 {
+    if ($request->filled('rfc')) {
+        $request->merge(['rfc' => strtoupper($request->input('rfc'))]);
+    }
+
     $validated = $request->validate([
         'name' => ['required', 'string', 'max:255'],
-        'rfc' => ['nullable', 'string', 'max:13', Rule::unique('tenants', 'rfc')],
+        'rfc' => ['nullable', 'string', 'min:12', 'max:13', 'regex:/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/u', Rule::unique('tenants', 'rfc')],
         'billing_email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
         'phone' => ['nullable', 'string'],
-        'state' => ['nullable', 'string'],
+        'state' => ['required', 'string', 'max:100'],
         'city' => ['nullable', 'string'],
+        'postal_code' => ['nullable', 'digits:5'],
         'plan_id' => ['nullable', 'exists:plans,id'],
     ]);
 
     DB::transaction(function () use ($validated) {
         $tenant = Tenant::create([
             'name' => $validated['name'],
-            'rfc' => $validated['rfc'] ?? null,
+            'rfc' => isset($validated['rfc']) ? strtoupper($validated['rfc']) : null,
             'billing_email' => $validated['billing_email'],
             'phone' => $validated['phone'] ?? null,
             'state' => $validated['state'] ?? null,
             'city' => $validated['city'] ?? null,
+            'postal_code' => $validated['postal_code'] ?? null,
             'plan_id' => $validated['plan_id'] ?? null,
             'status' => 'active',
         ]);
@@ -99,6 +106,8 @@ public function store(Request $request)
      */
  public function edit(Tenant $tenant)
 {
+    $tenant->load(['payments' => fn ($query) => $query->latest()]);
+
     $plans = Plan::where('is_active', true)
         ->orderBy('price')
         ->get();
@@ -112,17 +121,25 @@ public function store(Request $request)
      */
  public function update(Request $request, Tenant $tenant)
     {
+        if ($request->filled('rfc')) {
+            $request->merge(['rfc' => strtoupper($request->input('rfc'))]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'rfc' => ['nullable', 'string', 'max:13', Rule::unique('tenants', 'rfc')->ignore($tenant->id)],
+            'rfc' => ['nullable', 'string', 'min:12', 'max:13', 'regex:/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/u', Rule::unique('tenants', 'rfc')->ignore($tenant->id)],
             'billing_email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30'],
             'state' => ['nullable', 'string', 'max:100'],
             'city' => ['nullable', 'string', 'max:100'],
+            'postal_code' => ['nullable', 'digits:5'],
             'domain' => ['nullable', 'string', 'max:255'],
             'status' => ['required', 'in:active,inactive,suspended'],
             'plan_id' => ['nullable', 'exists:plans,id'],
+            'grace_days' => ['required', 'integer', 'min:0', 'max:365'],
         ]);
+
+        $validated['rfc'] = isset($validated['rfc']) ? strtoupper($validated['rfc']) : null;
 
         $tenant->update($validated);
 
@@ -140,6 +157,10 @@ public function store(Request $request)
     }
     public function subscribe(Tenant $tenant)
 {
+    if ($tenant->plan?->isManual()) {
+        return back()->with('error', 'Este cliente tiene un plan manual. No necesita checkout de Stripe.');
+    }
+
     if (!$tenant->plan || !$tenant->plan->stripe_price_id) {
         return back()->with('error', 'El cliente no tiene un plan válido.');
     }
@@ -244,7 +265,7 @@ public function store(Request $request)
 
 //     return response('OK', 200);
 // }
-public function webhook(Request $request)
+public function webhook(Request $request, TenantStripeBillingService $billing)
 {
     \Log::info('WEBHOOK STRIPE ENTRÓ');
 
@@ -272,15 +293,12 @@ public function webhook(Request $request)
     if ($event->type === 'checkout.session.completed') {
         $session = $event->data->object;
 
-        $tenant = Tenant::where('stripe_customer_id', $session->customer)->first();
+        $tenant = $billing->syncCheckoutSession($session->id, $event->id);
 
-        if ($tenant && $session->subscription) {
-            $this->syncTenantSubscriptionFromStripe(
-                $tenant,
-                $session->subscription,
-                'checkout.session.completed'
-            );
-        }
+        \Log::info('Checkout SaaS sincronizado', [
+            'tenant_id' => $tenant?->id,
+            'session_id' => $session->id,
+        ]);
     }
 
     if ($event->type === 'invoice.paid') {
@@ -293,30 +311,11 @@ public function webhook(Request $request)
     'raw' => $invoice->toArray(),
 ]);
 
-        $tenant = Tenant::where('stripe_customer_id', $invoice->customer)->first();
+        $tenant = $billing->syncInvoice($invoice, $event->id);
 
-        $subscriptionId = $invoice->subscription
-    ?? ($invoice->parent->subscription_details->subscription ?? null);
-
-if ($tenant && $subscriptionId) {
-    $this->syncTenantSubscriptionFromStripe(
-        $tenant,
-        $subscriptionId,
-        'invoice.paid'
-    );
-}
-        // if ($tenant && $invoice->subscription) {
-        //     $this->syncTenantSubscriptionFromStripe(
-        //         $tenant,
-        //         $invoice->subscription,
-        //         'invoice.paid'
-        //     );
-        // }
-    }else {
-        \Log::warning('No se pudo procesar invoice.paid', [
-            'tenant_found' => (bool) $tenant,
-            'customer' => $invoice->customer ?? null,
-            'subscription_id' => $subscriptionId,
+        \Log::info('Invoice SaaS sincronizada', [
+            'tenant_id' => $tenant?->id,
+            'invoice_id' => $invoice->id ?? null,
         ]);
     }
 
@@ -329,7 +328,7 @@ if ($tenant && $subscriptionId) {
         $tenant = Tenant::where('stripe_customer_id', $subscription->customer)->first();
 
         if ($tenant) {
-            $this->updateTenantFromSubscriptionObject(
+            $billing->updateTenantFromSubscriptionObject(
                 $tenant,
                 $subscription,
                 $event->type

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
+use App\Models\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use App\Services\Stripe\StripePlanService;  
@@ -31,6 +32,7 @@ public function store(Request $request, StripePlanService $stripeService)
         'price' => ['required', 'numeric', 'min:0'],
         'currency' => ['required', 'string', 'max:3'],
         'billing_period' => ['required', 'in:monthly,yearly'],
+        'billing_mode' => ['required', 'in:manual,stripe'],
         'max_users' => ['nullable', 'integer'],
         'max_customers' => ['nullable', 'integer'],
         'description' => ['nullable', 'string'],
@@ -42,11 +44,15 @@ public function store(Request $request, StripePlanService $stripeService)
     $plan = \App\Models\Plan::create($validated);
 
     // 🔥 Aquí se crea en Stripe
-    $stripeService->createProductAndPrice($plan);
+    if ($plan->billing_mode === 'stripe') {
+        $stripeService->createProductAndPrice($plan);
+    }
 
     return redirect()
         ->route('admin.planes.index')
-        ->with('success', 'Plan creado y sincronizado con Stripe.');
+        ->with('success', $plan->billing_mode === 'stripe'
+            ? 'Plan creado y sincronizado con Stripe.'
+            : 'Plan manual creado correctamente.');
 }
 
     public function edit(Plan $plan)
@@ -61,6 +67,7 @@ public function store(Request $request, StripePlanService $stripeService)
             'price' => ['required', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'max:3'],
             'billing_period' => ['required', 'in:monthly,yearly'],
+            'billing_mode' => ['required', 'in:manual,stripe'],
             'max_users' => ['nullable', 'integer'],
             'max_customers' => ['nullable', 'integer'],
             'description' => ['nullable', 'string'],
@@ -70,6 +77,10 @@ public function store(Request $request, StripePlanService $stripeService)
         $validated['slug'] = Str::slug($validated['name']);
 
         $plan->update($validated);
+
+        if ($plan->billing_mode === 'stripe' && ! $plan->stripe_price_id) {
+            app(StripePlanService::class)->createProductAndPrice($plan);
+        }
 
         return redirect()
             ->route('admin.planes.index')
@@ -86,6 +97,10 @@ public function store(Request $request, StripePlanService $stripeService)
     }
     public function subscribe(Tenant $tenant)
 {
+    if ($tenant->plan?->isManual()) {
+        return back()->with('error', 'Este cliente tiene un plan manual. No necesita checkout de Stripe.');
+    }
+
     if (!$tenant->plan || !$tenant->plan->stripe_price_id) {
         return back()->with('error', 'El cliente no tiene un plan válido.');
     }

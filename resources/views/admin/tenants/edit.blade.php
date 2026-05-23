@@ -13,6 +13,17 @@
     </x-slot>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        @php
+            $states = [
+                'Aguascalientes', 'Baja California', 'Baja California Sur', 'Campeche', 'Chiapas',
+                'Chihuahua', 'Ciudad de Mexico', 'Coahuila', 'Colima', 'Durango', 'Estado de Mexico',
+                'Guanajuato', 'Guerrero', 'Hidalgo', 'Jalisco', 'Michoacan', 'Morelos', 'Nayarit',
+                'Nuevo Leon', 'Oaxaca', 'Puebla', 'Queretaro', 'Quintana Roo', 'San Luis Potosi',
+                'Sinaloa', 'Sonora', 'Tabasco', 'Tamaulipas', 'Tlaxcala', 'Veracruz', 'Yucatan',
+                'Zacatecas',
+            ];
+        @endphp
+
         <form method="POST" action="{{ route('admin.tenants.update', $tenant) }}">
             @csrf
             @method('PUT')
@@ -59,9 +70,15 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Estado
                     </label>
-                    <input type="text" name="state"
-                           value="{{ old('state', $tenant->state) }}"
-                           class="w-full rounded-lg border-gray-300 text-sm">
+                    <select name="state"
+                            class="w-full rounded-lg border-gray-300 text-sm">
+                        <option value="">Seleccionar estado</option>
+                        @foreach($states as $state)
+                            <option value="{{ $state }}" @selected(old('state', $tenant->state) === $state)>
+                                {{ $state }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <div>
@@ -70,6 +87,16 @@
                     </label>
                     <input type="text" name="city"
                            value="{{ old('city', $tenant->city) }}"
+                           class="w-full rounded-lg border-gray-300 text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Codigo postal
+                    </label>
+                    <input type="text" name="postal_code"
+                           value="{{ old('postal_code', $tenant->postal_code) }}"
+                           maxlength="5"
                            class="w-full rounded-lg border-gray-300 text-sm">
                 </div>
 
@@ -114,6 +141,22 @@
                             Suspendido
                         </option>
                     </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Dias de gracia
+                    </label>
+                    <input type="number"
+                           name="grace_days"
+                           min="0"
+                           max="365"
+                           value="{{ old('grace_days', $tenant->grace_days ?? 0) }}"
+                           class="w-full rounded-lg border-gray-300 text-sm"
+                           placeholder="Ej. 7">
+                    <p class="mt-1 text-xs text-gray-500">
+                        Permite acceso despues del vencimiento antes de bloquear.
+                    </p>
                 </div>
 
             </div>
@@ -177,6 +220,53 @@
                         {{ $tenant->stripe_subscription_id ?? 'Sin suscripción' }}
                     </td>
                 </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+        Pagos Stripe
+    </h3>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Fecha</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Monto</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Estado</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Invoice</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Subscription</th>
+                </tr>
+            </thead>
+
+            <tbody class="bg-white divide-y divide-gray-200">
+                @forelse($tenant->payments as $payment)
+                    <tr>
+                        <td class="px-4 py-4 text-sm text-gray-600">
+                            {{ $payment->paid_at ? $payment->paid_at->format('d/m/Y H:i') : $payment->created_at->format('d/m/Y H:i') }}
+                        </td>
+                        <td class="px-4 py-4 text-sm text-gray-900">
+                            ${{ number_format($payment->amount, 2) }} {{ $payment->currency }}
+                        </td>
+                        <td class="px-4 py-4 text-sm text-gray-600">
+                            {{ $payment->status }}
+                        </td>
+                        <td class="px-4 py-4 text-xs text-gray-600">
+                            {{ $payment->stripe_invoice_id ?? 'Sin invoice' }}
+                        </td>
+                        <td class="px-4 py-4 text-xs text-gray-600">
+                            {{ $payment->stripe_subscription_id ?? 'Sin suscripcion' }}
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="px-4 py-6 text-sm text-gray-500 text-center">
+                            Aun no hay pagos registrados en la base local.
+                        </td>
+                    </tr>
+                @endforelse
             </tbody>
         </table>
     </div>

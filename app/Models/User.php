@@ -24,6 +24,7 @@ class User extends Authenticatable
         'email',
         'password',
         'tenant_id',
+        'email_verified_at',
     ];
 
     /**

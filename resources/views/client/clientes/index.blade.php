@@ -1,5 +1,7 @@
 <x-layouts.client>
     <div x-data="{
+        openCreateCustomer: {{ $errors->any() ? 'true' : 'false' }},
+        savingCustomer: false,
         openAssignPlan: false,
         selectedCustomerId: null,
         selectedCustomerName: '',
@@ -9,6 +11,52 @@
         paymentCustomerName: '',
         paymentPlanName: '',
         paymentAmount: '',
+        customerForm: {
+            rfc: @js(old('rfc', '')),
+            razon_social: @js(old('razon_social', '')),
+            email: @js(old('email', '')),
+            phone: @js(old('phone', '')),
+            state: @js(old('state', '')),
+            city: @js(old('city', '')),
+            postal_code: @js(old('postal_code', '')),
+        },
+
+        normalizeCustomerRfc() {
+            this.customerForm.rfc = this.customerForm.rfc.toUpperCase().replace(/[^A-Z0-9&]/g, '').slice(0, 13);
+        },
+
+        normalizeCustomerPostalCode() {
+            this.customerForm.postal_code = this.customerForm.postal_code.replace(/\D/g, '').slice(0, 5);
+        },
+
+        hasCustomerValue(field) {
+            return String(this.customerForm[field] ?? '').trim().length > 0;
+        },
+
+        validCustomerRfc() {
+            return /^[A-Z&]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(this.customerForm.rfc);
+        },
+
+        validCustomerName() {
+            return this.hasCustomerValue('razon_social');
+        },
+
+        validCustomerEmail() {
+            if (!this.hasCustomerValue('email')) return true;
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.customerForm.email);
+        },
+
+        validCustomerPostalCode() {
+            if (!this.hasCustomerValue('postal_code')) return true;
+            return /^[0-9]{5}$/.test(this.customerForm.postal_code);
+        },
+
+        canSaveCustomer() {
+            return this.validCustomerRfc()
+                && this.validCustomerName()
+                && this.validCustomerEmail()
+                && this.validCustomerPostalCode();
+        },
 
         openModal(customerId, customerName) {
             this.selectedCustomerId = customerId;
@@ -24,7 +72,7 @@
             this.paymentAction = `/client/clientes/${customerId}/subscriptions/${subscriptionId}/manual-payment`;
             this.openPaymentModal = true;
         }
-    }">
+    }" @open-customer-modal.window="openCreateCustomer = true">
 
     <x-slot name="header">
         <div class="flex items-center justify-between">
@@ -33,7 +81,7 @@
             </h1>
 
             <button type="button"
-                    onclick="document.getElementById('modalCliente').classList.remove('hidden')"
+                    onclick="window.dispatchEvent(new CustomEvent('open-customer-modal'))"
                     class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
                 + Nuevo cliente
             </button>
@@ -206,23 +254,35 @@
     </div>
 
     {{-- MODAL NUEVO CLIENTE --}}
-    <div id="modalCliente"
-         class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center px-4">
+    @php
+        $states = [
+            'Aguascalientes', 'Baja California', 'Baja California Sur', 'Campeche', 'Chiapas',
+            'Chihuahua', 'Ciudad de Mexico', 'Coahuila', 'Colima', 'Durango', 'Estado de Mexico',
+            'Guanajuato', 'Guerrero', 'Hidalgo', 'Jalisco', 'Michoacan', 'Morelos', 'Nayarit',
+            'Nuevo Leon', 'Oaxaca', 'Puebla', 'Queretaro', 'Quintana Roo', 'San Luis Potosi',
+            'Sinaloa', 'Sonora', 'Tabasco', 'Tamaulipas', 'Tlaxcala', 'Veracruz', 'Yucatan',
+            'Zacatecas',
+        ];
+    @endphp
 
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+    <div x-show="openCreateCustomer"
+         x-cloak
+         class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center px-4">
+
+        <div class="relative overflow-hidden bg-white rounded-2xl shadow-xl w-full max-w-lg">
             <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-900">
                     Nuevo cliente
                 </h3>
 
                 <button type="button"
-                        onclick="document.getElementById('modalCliente').classList.add('hidden')"
+                        @click="openCreateCustomer = false"
                         class="text-gray-400 hover:text-gray-600 text-2xl leading-none">
                     &times;
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('client.clientes.store') }}" class="p-6 space-y-4">
+            <form method="POST" action="{{ route('client.clientes.store') }}" class="p-6 space-y-4" @submit="savingCustomer = true">
     @csrf
 
     <div>
@@ -232,9 +292,19 @@
         <input type="text"
                name="rfc"
                maxlength="13"
+               x-model="customerForm.rfc"
+               @input="normalizeCustomerRfc()"
                required
-               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+               class="w-full rounded-lg focus:border-blue-500 focus:ring-blue-500"
+               :class="validCustomerRfc() ? 'border-gray-300' : 'border-red-400 focus:border-red-500 focus:ring-red-500'"
                placeholder="Ej. XAXX010101000">
+        <div class="mt-1 flex items-center justify-between text-xs">
+            <span :class="validCustomerRfc() ? 'text-green-600' : 'text-red-600'">
+                <span x-show="validCustomerRfc()">&#10003;</span>
+                RFC valido de 12 o 13 caracteres.
+            </span>
+            <span class="text-gray-400" x-text="customerForm.rfc.length + '/13'"></span>
+        </div>
     </div>
 
     <div>
@@ -243,6 +313,7 @@
         </label>
         <input type="text"
                name="razon_social"
+               x-model="customerForm.razon_social"
                required
                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                placeholder="Nombre o razón social">
@@ -253,23 +324,93 @@
     </label>
     <input type="email"
            name="email"
-           class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+           x-model="customerForm.email"
+           class="w-full rounded-lg focus:border-blue-500 focus:ring-blue-500"
+           :class="validCustomerEmail() ? 'border-gray-300' : 'border-red-400 focus:border-red-500 focus:ring-red-500'"
            placeholder="cliente@correo.com">
+    <p x-show="hasCustomerValue('email') && validCustomerEmail()" class="mt-1 text-xs font-semibold text-green-600">&#10003; Email valido</p>
 </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+            Telefono / WhatsApp
+        </label>
+        <input type="text"
+               name="phone"
+               x-model="customerForm.phone"
+               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+               placeholder="Ej. 8112345678">
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+                Estado
+            </label>
+            <select name="state"
+                    x-model="customerForm.state"
+                    class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                <option value="">Seleccionar estado</option>
+                @foreach($states as $state)
+                    <option value="{{ $state }}">{{ $state }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+                Codigo postal
+            </label>
+            <input type="text"
+                   name="postal_code"
+                   maxlength="5"
+                   x-model="customerForm.postal_code"
+                   @input="normalizeCustomerPostalCode()"
+                   class="w-full rounded-lg focus:border-blue-500 focus:ring-blue-500"
+                   :class="validCustomerPostalCode() ? 'border-gray-300' : 'border-red-400 focus:border-red-500 focus:ring-red-500'"
+                   placeholder="Ej. 64000">
+            <div class="mt-1 flex items-center justify-between text-xs">
+                <span x-show="hasCustomerValue('postal_code') && validCustomerPostalCode()" class="font-semibold text-green-600">&#10003; CP valido</span>
+                <span class="ml-auto text-gray-400" x-text="customerForm.postal_code.length + '/5'"></span>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+            Ciudad
+        </label>
+        <input type="text"
+               name="city"
+               x-model="customerForm.city"
+               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+               placeholder="Ciudad">
+    </div>
 
     <div class="flex items-center justify-end gap-3 pt-4">
         <button type="button"
-                onclick="document.getElementById('modalCliente').classList.add('hidden')"
+                @click="openCreateCustomer = false"
                 class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
             Cancelar
         </button>
 
         <button type="submit"
-                class="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700">
+                :disabled="!canSaveCustomer() || savingCustomer"
+                class="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300">
             Guardar cliente
         </button>
     </div>
 </form>
+            <div x-show="savingCustomer"
+                 x-transition.opacity
+                 class="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/75 backdrop-blur-sm"
+                 style="display: none;">
+                <div class="text-center">
+                    <div class="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
+                    <p class="text-sm font-bold text-slate-900">Guardando</p>
+                    <p class="mt-1 text-xs text-slate-500">Estamos trabajando...</p>
+                </div>
+            </div>
         </div>
         
     </div>

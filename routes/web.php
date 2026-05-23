@@ -5,11 +5,14 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\ClienteController;
 use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\TenantController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Stripe\CustomerStripeWebhookController;
 
 use App\Http\Controllers\Client\StripeConnectController;
 use App\Http\Controllers\Client\CustomerPlanController;
 use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
+use App\Http\Controllers\Client\BillingController;
+use App\Http\Controllers\Client\UserController as ClientUserController;
 use App\Http\Controllers\Client\AccountingAccountController;
 use App\Http\Controllers\Client\AccountingJournalController;
 use App\Http\Controllers\Client\AccountingThirdPartyController;
@@ -71,9 +74,7 @@ Route::get('/dashboard', function () {
     ->name('admin.')
     ->group(function () {
 
-        Route::get('/dashboard', function () {
-            return view('admin.dashboard');
-        })->name('dashboard');
+        Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
         Route::resource('clientes', ClienteController::class);
         Route::resource('planes', PlanController::class);
@@ -91,6 +92,15 @@ Route::get('/dashboard', function () {
     ->prefix('client')
     ->name('client.')
     ->group(function () {
+        Route::get('billing/pending', [BillingController::class, 'pending'])->name('billing.pending');
+        Route::get('billing/checkout', [BillingController::class, 'checkout'])->name('billing.checkout');
+    });
+
+   Route::middleware(['auth', 'verified'])
+    ->middleware('tenant.saas.active')
+    ->prefix('client')
+    ->name('client.')
+    ->group(function () {
 
         Route::get('/dashboard', [ClientDashboardController::class, 'index'])->name('dashboard');
 
@@ -100,6 +110,11 @@ Route::get('/dashboard', function () {
 
         Route::resource('customer-plans', CustomerPlanController::class)
             ->names('customer-plans');
+
+        Route::resource('users', ClientUserController::class)
+            ->only(['index', 'store', 'update', 'destroy'])
+            ->middleware('permission:tenant.manage_users')
+            ->names('users');
 
         Route::post('clientes/{customer}/assign-plan', [ClientClienteController::class, 'assignPlan'])
             ->name('clientes.assign-plan');
@@ -139,6 +154,7 @@ Route::get('/dashboard', function () {
     });
 // Rutas SAT
 Route::middleware(['auth', 'verified'])
+    ->middleware('tenant.saas.active')
     ->prefix('client')
     ->name('client.')
     ->group(function () {
@@ -166,6 +182,7 @@ Route::middleware(['auth', 'verified'])
             });
     });
 Route::middleware(['auth', 'verified'])
+    ->middleware('tenant.saas.active')
     ->prefix('client')
     ->name('client.')
     ->group(function () {

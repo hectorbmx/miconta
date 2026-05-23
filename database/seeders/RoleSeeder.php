@@ -15,12 +15,14 @@ class RoleSeeder extends Seeder
   public function run(): void
 {
     // Roles principales
-    $admin = Role::create(['name' => 'admin']);
-    $contador = Role::create(['name' => 'contador']);
+    $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+    $contador = Role::firstOrCreate(['name' => 'contador', 'guard_name' => 'web']);
 
     // Permisos de ejemplo
-    Permission::create(['name' => 'manage tenants'])->assignRole($admin);
-    Permission::create(['name' => 'manage taxpayers'])->assignRole($contador);
-    Permission::create(['name' => 'download cfdi'])->assignRole($contador);
+    Permission::firstOrCreate(['name' => 'manage tenants', 'guard_name' => 'web'])->assignRole($admin);
+    Permission::firstOrCreate(['name' => 'manage taxpayers', 'guard_name' => 'web'])->assignRole($contador);
+    Permission::firstOrCreate(['name' => 'download cfdi', 'guard_name' => 'web'])->assignRole($contador);
+
+    $this->call(TenantRoleSeeder::class);
 }
 }

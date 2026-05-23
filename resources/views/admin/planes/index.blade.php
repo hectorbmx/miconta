@@ -12,7 +12,7 @@
         </div>
     </x-slot>
 
-    <div x-data="{ openModal: false }"
+    <div x-data="{ openModal: false, billingMode: '{{ old('billing_mode', 'manual') }}' }"
          @open-plan-modal.window="openModal = true">
 
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -24,6 +24,7 @@
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Nombre</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Precio</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Periodo</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Cobro</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Límites</th>
                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Estado</th>
                             <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Acciones</th>
@@ -43,6 +44,18 @@
 
                                 <td class="px-6 py-4 text-sm text-gray-600 capitalize">
                                     {{ $plan->billing_period }}
+                                </td>
+
+                                <td class="px-6 py-4 text-sm">
+                                    @if(($plan->billing_mode ?? 'manual') === 'stripe')
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700">
+                                            Stripe
+                                        </span>
+                                    @else
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">
+                                            Manual
+                                        </span>
+                                    @endif
                                 </td>
 
                                 <td class="px-6 py-4 text-sm text-gray-600">
@@ -84,7 +97,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500">
+                                <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
                                     No hay planes registrados.
                                 </td>
                             </tr>
@@ -133,6 +146,30 @@
                             <option value="monthly">Mensual</option>
                             <option value="yearly">Anual</option>
                         </select>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <label class="rounded-xl border border-gray-200 p-4 cursor-pointer"
+                                   :class="billingMode === 'manual' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-gray-700'">
+                                <input type="radio"
+                                       name="billing_mode"
+                                       value="manual"
+                                       class="sr-only"
+                                       x-model="billingMode">
+                                <span class="block text-sm font-bold">Pago manual</span>
+                                <span class="block text-xs mt-1 opacity-80">Activas el acceso del cliente desde admin.</span>
+                            </label>
+
+                            <label class="rounded-xl border border-gray-200 p-4 cursor-pointer"
+                                   :class="billingMode === 'stripe' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'">
+                                <input type="radio"
+                                       name="billing_mode"
+                                       value="stripe"
+                                       class="sr-only"
+                                       x-model="billingMode">
+                                <span class="block text-sm font-bold">Pago automatico</span>
+                                <span class="block text-xs mt-1 opacity-80">Crea producto y precio en Stripe.</span>
+                            </label>
+                        </div>
 
                         <input type="number" name="max_users" placeholder="Máx usuarios"
                                class="w-full rounded-lg border-gray-300 text-sm">

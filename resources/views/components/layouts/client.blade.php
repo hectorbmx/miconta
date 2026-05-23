@@ -65,14 +65,16 @@
                 <span x-show="sidebarOpen">Documentos</span>
             </a>
 
-            <a href="#"
-               class="flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium
-               {{ request()->routeIs('client.users.*')
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                <span>👤</span>
-                <span x-show="sidebarOpen">Usuarios</span>
-            </a>
+            @can('tenant.manage_users')
+                <a href="{{ route('client.users.index') }}"
+                   class="flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium
+                   {{ request()->routeIs('client.users.*')
+                        ? 'bg-slate-800 text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
+                    <span>👤</span>
+                    <span x-show="sidebarOpen">Usuarios</span>
+                </a>
+            @endcan
 
             <a href="#"
                class="flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium
@@ -130,6 +132,33 @@
 
         {{-- Contenido --}}
         <main class="p-8">
+            @php
+                $tenant = Auth::user()?->tenant;
+            @endphp
+
+            @if($tenant?->shouldShowPaymentReminder())
+                <div class="mb-6 rounded-lg border border-yellow-300 bg-yellow-50 px-5 py-4 text-yellow-900 shadow-sm">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <p class="text-sm font-semibold">Pago pendiente de suscripcion</p>
+                            <p class="mt-1 text-sm">
+                                Tu suscripcion requiere atencion para evitar el bloqueo del sistema.
+                                @if($tenant->isInGracePeriod())
+                                    Tienes {{ $tenant->graceDaysRemaining() }} dia(s) de gracia restantes.
+                                @elseif($tenant->current_period_ends_at)
+                                    El periodo vencio el {{ $tenant->current_period_ends_at->format('d/m/Y H:i') }}.
+                                @endif
+                            </p>
+                        </div>
+
+                        <a href="{{ route('client.billing.pending') }}"
+                           class="inline-flex items-center justify-center rounded-lg bg-yellow-600 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-700">
+                            Revisar pago
+                        </a>
+                    </div>
+                </div>
+            @endif
+
             {{ $slot }}
         </main>
 

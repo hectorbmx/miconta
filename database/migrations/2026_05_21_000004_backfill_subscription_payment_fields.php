@@ -7,11 +7,20 @@ return new class extends Migration
 {
     public function up(): void
     {
+        $planBillingModes = DB::table('customer_plans')
+            ->pluck('billing_mode', 'id');
+
         DB::table('customer_subscriptions')
-            ->join('customer_plans', 'customer_plans.id', '=', 'customer_subscriptions.customer_plan_id')
-            ->update([
-                'customer_subscriptions.billing_mode' => DB::raw("COALESCE(customer_plans.billing_mode, 'manual')"),
-            ]);
+            ->select('id', 'customer_plan_id')
+            ->orderBy('id')
+            ->get()
+            ->each(function ($subscription) use ($planBillingModes) {
+                DB::table('customer_subscriptions')
+                    ->where('id', $subscription->id)
+                    ->update([
+                        'billing_mode' => $planBillingModes[$subscription->customer_plan_id] ?? 'manual',
+                    ]);
+            });
 
         DB::table('customer_subscriptions')
             ->where('stripe_payment_status', 'paid')

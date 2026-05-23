@@ -12,6 +12,16 @@
     </x-slot>
 
     <div class="max-w-5xl mx-auto py-6">
+        @php
+            $states = [
+                'Aguascalientes', 'Baja California', 'Baja California Sur', 'Campeche', 'Chiapas',
+                'Chihuahua', 'Ciudad de Mexico', 'Coahuila', 'Colima', 'Durango', 'Estado de Mexico',
+                'Guanajuato', 'Guerrero', 'Hidalgo', 'Jalisco', 'Michoacan', 'Morelos', 'Nayarit',
+                'Nuevo Leon', 'Oaxaca', 'Puebla', 'Queretaro', 'Quintana Roo', 'San Luis Potosi',
+                'Sinaloa', 'Sonora', 'Tabasco', 'Tamaulipas', 'Tlaxcala', 'Veracruz', 'Yucatan',
+                'Zacatecas',
+            ];
+        @endphp
         {{-- Estado de la e.firma (Visualización rápida) --}}
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <h2 class="text-lg font-bold mb-4">Estado de la e.firma</h2>
@@ -29,8 +39,8 @@
         </div>
 
         {{-- Formulario de Edición --}}
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <form method="POST" action="{{ route('client.clientes.update', $customer->id) }}" enctype="multipart/form-data">
+        <div x-data="{ saving: false }" class="relative overflow-hidden bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <form method="POST" action="{{ route('client.clientes.update', $customer->id) }}" enctype="multipart/form-data" @submit="saving = true">
                 @csrf 
                 @method('PUT')
 
@@ -52,6 +62,33 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700">Correo para Notificaciones</label>
                             <input type="email" name="email" value="{{ old('email', $customer->email) }}" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Telefono / WhatsApp</label>
+                            <input type="text" name="phone" value="{{ old('phone', $customer->phone) }}" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Estado</label>
+                            <select name="state" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm">
+                                <option value="">Seleccionar estado</option>
+                                @foreach($states as $state)
+                                    <option value="{{ $state }}" @selected(old('state', $customer->state) === $state)>
+                                        {{ $state }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Ciudad</label>
+                            <input type="text" name="city" value="{{ old('city', $customer->city) }}" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Codigo postal</label>
+                            <input type="text" name="postal_code" maxlength="5" value="{{ old('postal_code', $customer->postal_code) }}" class="w-full mt-1 border-gray-300 rounded-lg shadow-sm">
                         </div>
                     </div>
 
@@ -91,11 +128,23 @@
 </div>
 
                 <div class="mt-8 flex justify-end">
-                    <button type="submit" class="bg-gray-900 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-800">
+                    <button type="submit"
+                            :disabled="saving"
+                            class="bg-gray-900 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300">
                         Actualizar Información
                     </button>
                 </div>
             </form>
+            <div x-show="saving"
+                 x-transition.opacity
+                 class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/75 backdrop-blur-sm"
+                 style="display: none;">
+                <div class="text-center">
+                    <div class="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900"></div>
+                    <p class="text-sm font-bold text-slate-900">Guardando</p>
+                    <p class="mt-1 text-xs text-slate-500">Estamos trabajando...</p>
+                </div>
+            </div>
         </div>
     </div>
 </x-layouts.client>

@@ -48,10 +48,18 @@
          */
     public function store(Request $request)
     {
+        if ($request->filled('rfc')) {
+            $request->merge(['rfc' => strtoupper($request->input('rfc'))]);
+        }
+
         $request->validate([
-            'rfc' => 'required|string|max:13',
+            'rfc' => ['required', 'string', 'min:12', 'max:13', 'regex:/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/u'],
             'razon_social' => 'required|string|max:255',
             'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'postal_code' => ['nullable', 'digits:5'],
             'fiel_password' => 'nullable|string',
         ]);
 
@@ -60,6 +68,10 @@
             'rfc' => $request->rfc,
             'razon_social' => $request->razon_social,
             'email' => $request->email,
+            'phone' => $request->phone,
+            'state' => $request->state,
+            'city' => $request->city,
+            'postal_code' => $request->postal_code,
             'fiel_password' => $request->fiel_password,
             
         ]);
@@ -127,10 +139,18 @@
     {
         $this->authorizeTenant($customer);
 
+        if ($request->filled('rfc')) {
+            $request->merge(['rfc' => strtoupper($request->input('rfc'))]);
+        }
+
         $request->validate([
             'razon_social' => 'required|string|max:255',
-            'rfc' => 'nullable|string|max:20',
+            'rfc' => ['nullable', 'string', 'min:12', 'max:13', 'regex:/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/u'],
             'email' => 'nullable|email|max:255',
+            'phone' => ['nullable', 'string', 'max:30'],
+            'state' => ['nullable', 'string', 'max:100'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'postal_code' => ['nullable', 'digits:5'],
 
             // 'certificate' => 'nullable|file|mimes:cer',
             'certificate' => 'nullable|file|extensions:cer',
@@ -145,6 +165,10 @@
             'razon_social' => $request->razon_social,
             'rfc' => $request->rfc,
             'email' => $request->email,
+            'phone' => $request->phone,
+            'state' => $request->state,
+            'city' => $request->city,
+            'postal_code' => $request->postal_code,
         ];
 
         // 📄 Certificado

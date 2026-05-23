@@ -13,7 +13,60 @@
         </div>
     </x-slot>
 
-    <div x-data="{ openModal: false }"
+    @php
+        $states = [
+            'Aguascalientes', 'Baja California', 'Baja California Sur', 'Campeche', 'Chiapas',
+            'Chihuahua', 'Ciudad de Mexico', 'Coahuila', 'Colima', 'Durango', 'Estado de Mexico',
+            'Guanajuato', 'Guerrero', 'Hidalgo', 'Jalisco', 'Michoacan', 'Morelos', 'Nayarit',
+            'Nuevo Leon', 'Oaxaca', 'Puebla', 'Queretaro', 'Quintana Roo', 'San Luis Potosi',
+            'Sinaloa', 'Sonora', 'Tabasco', 'Tamaulipas', 'Tlaxcala', 'Veracruz', 'Yucatan',
+            'Zacatecas',
+        ];
+    @endphp
+
+    <div x-data="{
+            openModal: {{ $errors->any() ? 'true' : 'false' }},
+            saving: false,
+            form: {
+                name: @js(old('name', '')),
+                rfc: @js(old('rfc', '')),
+                billing_email: @js(old('billing_email', '')),
+                phone: @js(old('phone', '')),
+                state: @js(old('state', '')),
+                city: @js(old('city', '')),
+                postal_code: @js(old('postal_code', '')),
+                plan_id: @js(old('plan_id', '')),
+            },
+            normalizeRfc() {
+                this.form.rfc = this.form.rfc.toUpperCase().replace(/[^A-Z0-9&Ñ]/g, '').slice(0, 13);
+            },
+            normalizePostalCode() {
+                this.form.postal_code = this.form.postal_code.replace(/\D/g, '').slice(0, 5);
+            },
+            hasValue(field) {
+                return String(this.form[field] ?? '').trim().length > 0;
+            },
+            validName() {
+                return this.hasValue('name');
+            },
+            validEmail() {
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.form.billing_email);
+            },
+            validRfc() {
+                if (!this.hasValue('rfc')) return true;
+                return /^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(this.form.rfc);
+            },
+            validPostalCode() {
+                if (!this.hasValue('postal_code')) return true;
+                return /^[0-9]{5}$/.test(this.form.postal_code);
+            },
+            validState() {
+                return this.hasValue('state');
+            },
+            canSubmit() {
+                return this.validName() && this.validEmail() && this.validRfc() && this.validPostalCode() && this.validState();
+            }
+        }"
          @open-tenant-modal.window="openModal = true">
 
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -80,7 +133,11 @@
     </form>
 @endif
 
-        @if(!$tenant->stripe_subscription_id)
+        @if($tenant->plan?->isManual())
+            <span class="text-slate-600 text-sm font-medium">
+                Pago manual
+            </span>
+        @elseif(!$tenant->stripe_subscription_id)
             <a href="{{ route('admin.tenants.subscribe', $tenant) }}"
                class="text-indigo-600 hover:text-indigo-800 font-medium">
                 Suscribir
@@ -140,42 +197,86 @@
              style="display: none;">
 
             <div @click.away="openModal = false"
-                 class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6">
+                 class="relative overflow-hidden bg-white rounded-xl shadow-lg w-full max-w-lg p-6">
 
                 <h2 class="text-lg font-semibold text-gray-800 mb-4">
                     Nuevo Cliente SaaS
                 </h2>
 
-                <form method="POST" action="{{ route('admin.tenants.store') }}">
+                <form method="POST" action="{{ route('admin.tenants.store') }}" @submit="saving = true">
                     @csrf
 
                     <div class="grid grid-cols-1 gap-4">
-                        <input type="text" name="name" placeholder="Nombre / Razón social"
-                               class="w-full rounded-lg border-gray-300 text-sm" required>
+                        <div class="relative">
+                            <input type="text" name="name" placeholder="Nombre / Razon social"
+                                   x-model="form.name"
+                                   class="w-full rounded-lg border-gray-300 pr-10 text-sm" required>
+                            <span x-show="validName()" class="absolute right-3 top-2.5 text-sm font-bold text-green-600">&#10003;</span>
+                        </div>
 
-                        <input type="text" name="rfc" placeholder="RFC"
-                               class="w-full rounded-lg border-gray-300 text-sm">
+                        <div>
+                            <div class="relative">
+                                <input type="text" name="rfc" placeholder="RFC"
+                                       x-model="form.rfc"
+                                       @input="normalizeRfc()"
+                                       maxlength="13"
+                                       class="w-full rounded-lg pr-16 text-sm"
+                                       :class="validRfc() ? 'border-gray-300' : 'border-red-400 focus:border-red-500 focus:ring-red-500'">
+                                <span x-show="validRfc() && hasValue('rfc')" class="absolute right-3 top-2.5 text-sm font-bold text-green-600">&#10003;</span>
+                                <span class="absolute right-3 top-2.5 text-xs font-semibold text-gray-400" x-show="!hasValue('rfc') || !validRfc()" x-text="form.rfc.length + '/13'"></span>
+                            </div>
+                            <p class="mt-1 text-xs" :class="validRfc() ? 'text-gray-500' : 'text-red-600'">
+                                RFC opcional. Si lo capturas debe tener 12 o 13 caracteres con formato valido.
+                            </p>
+                        </div>
 
-                        <input type="email" name="billing_email" placeholder="Email facturación"
-                               class="w-full rounded-lg border-gray-300 text-sm">
+                        <div class="relative">
+                            <input type="email" name="billing_email" placeholder="Email facturacion"
+                                   x-model="form.billing_email"
+                                   class="w-full rounded-lg border-gray-300 pr-10 text-sm" required>
+                            <span x-show="validEmail()" class="absolute right-3 top-2.5 text-sm font-bold text-green-600">&#10003;</span>
+                        </div>
 
                         <input type="text" name="phone" placeholder="Celular"
+                               x-model="form.phone"
                                class="w-full rounded-lg border-gray-300 text-sm">
 
-                        <input type="text" name="state" placeholder="Estado"
-                               class="w-full rounded-lg border-gray-300 text-sm">
+                        <div class="relative">
+                            <select name="state"
+                                    x-model="form.state"
+                                    class="w-full rounded-lg border-gray-300 pr-10 text-sm" required>
+                                <option value="">Seleccionar estado</option>
+                                @foreach($states as $state)
+                                    <option value="{{ $state }}">{{ $state }}</option>
+                                @endforeach
+                            </select>
+                            <span x-show="validState()" class="absolute right-9 top-2.5 text-sm font-bold text-green-600">&#10003;</span>
+                        </div>
 
                         <input type="text" name="city" placeholder="Ciudad"
+                               x-model="form.city"
                                class="w-full rounded-lg border-gray-300 text-sm">
 
+                        <div class="relative">
+                            <input type="text" name="postal_code" placeholder="Codigo postal"
+                                   x-model="form.postal_code"
+                                   @input="normalizePostalCode()"
+                                   maxlength="5"
+                                   class="w-full rounded-lg pr-16 text-sm"
+                                   :class="validPostalCode() ? 'border-gray-300' : 'border-red-400 focus:border-red-500 focus:ring-red-500'">
+                            <span x-show="validPostalCode() && hasValue('postal_code')" class="absolute right-3 top-2.5 text-sm font-bold text-green-600">&#10003;</span>
+                            <span class="absolute right-3 top-2.5 text-xs font-semibold text-gray-400" x-show="!hasValue('postal_code') || !validPostalCode()" x-text="form.postal_code.length + '/5'"></span>
+                        </div>
+
                         <select name="plan_id"
+                                x-model="form.plan_id"
                                 class="w-full rounded-lg border-gray-300 text-sm">
 
                             <option value="">Seleccionar plan</option>
 
                             @foreach($plans as $plan)
                                 <option value="{{ $plan->id }}">
-                                    {{ $plan->name }} - ${{ number_format($plan->price, 2) }} {{ $plan->currency }}
+                                    {{ $plan->name }} - ${{ number_format($plan->price, 2) }} {{ $plan->currency }} - {{ ($plan->billing_mode ?? 'manual') === 'stripe' ? 'Stripe' : 'Manual' }}
                                 </option>
                             @endforeach
 
@@ -190,11 +291,23 @@
                         </button>
 
                         <button type="submit"
-                                class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+                                :disabled="!canSubmit() || saving"
+                                class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300">
                             Guardar
                         </button>
                     </div>
                 </form>
+
+                <div x-show="saving"
+                     x-transition.opacity
+                     class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/75 backdrop-blur-sm"
+                     style="display: none;">
+                    <div class="text-center">
+                        <div class="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"></div>
+                        <p class="text-sm font-bold text-slate-900">Guardando</p>
+                        <p class="mt-1 text-xs text-slate-500">Estamos trabajando...</p>
+                    </div>
+                </div>
             </div>
         </div>
 

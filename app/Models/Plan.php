@@ -17,6 +17,7 @@ class Plan extends Model
         'price',
         'currency',
         'billing_period',
+        'billing_mode',
         'stripe_product_id', 
         'max_users',
         'max_customers',
@@ -60,5 +61,15 @@ class Plan extends Model
     public function isYearly(): bool
     {
         return $this->billing_period === 'yearly';
+    }
+
+    public function isManual(): bool
+    {
+        return ($this->billing_mode ?? 'manual') === 'manual';
+    }
+
+    public function isStripe(): bool
+    {
+        return ($this->billing_mode ?? 'manual') === 'stripe';
     }
 }
