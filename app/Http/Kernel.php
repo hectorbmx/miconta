@@ -64,6 +64,7 @@ class Kernel extends HttpKernel
         'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
         'signed' => \App\Http\Middleware\ValidateSignature::class,
         'tenant.saas.active' => \App\Http\Middleware\EnsureTenantHasActiveSaasAccess::class,
+        'n8n.secret' => \App\Http\Middleware\VerifyN8NSecret::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
     ];
