@@ -67,8 +67,8 @@ public function store(Request $request, StripeCustomerPlanService $stripeService
     return redirect()
         ->route('client.customer-plans.index')
         ->with('success', $plan->billing_mode === 'stripe'
-            ? 'Plan creado y sincronizado con Stripe.'
-            : 'Plan manual creado correctamente.');
+            ? 'Honorario creado y sincronizado con Stripe.'
+            : 'Honorario manual creado correctamente.');
 }
 
     /**

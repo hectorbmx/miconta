@@ -56,14 +56,6 @@
             <span>💳</span>
             <span x-show="sidebarOpen">Planes</span>
         </a>
-            <a href="#"
-               class="flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium
-               {{ request()->routeIs('client.documentos.*')
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                <span>📄</span>
-                <span x-show="sidebarOpen">Documentos</span>
-            </a>
 
             @can('tenant.manage_users')
                 <a href="{{ route('client.users.index') }}"
@@ -76,7 +68,7 @@
                 </a>
             @endcan
 
-            <a href="#"
+            <a href="{{ route('client.configuracion.index') }}"
                class="flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium
                {{ request()->routeIs('client.configuracion.*')
                     ? 'bg-slate-800 text-white'

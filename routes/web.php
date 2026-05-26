@@ -12,6 +12,7 @@ use App\Http\Controllers\Client\StripeConnectController;
 use App\Http\Controllers\Client\CustomerPlanController;
 use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
 use App\Http\Controllers\Client\BillingController;
+use App\Http\Controllers\Client\ConfigurationController as ClientConfigurationController;
 use App\Http\Controllers\Client\UserController as ClientUserController;
 use App\Http\Controllers\Client\AccountingAccountController;
 use App\Http\Controllers\Client\AccountingJournalController;
@@ -48,7 +49,17 @@ Route::post('/stripe/webhook', [TenantController::class, 'webhook']);
 Route::middleware(['auth', 'verified'])->group(function () {
 
 Route::get('/dashboard', function () {
-    return view('dashboard');
+    $user = auth()->user();
+
+    if ($user?->tenant_id) {
+        return redirect()->route('client.dashboard');
+    }
+
+    if ($user?->hasRole('admin')) {
+        return redirect()->route('admin.dashboard');
+    }
+
+    abort(403, 'Tu usuario no tiene permisos para acceder al sistema.');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -70,7 +81,7 @@ Route::get('/dashboard', function () {
     // Route::get('tenants/{tenant}/subscribe', [TenantController::class, 'subscribe'])->name('tenants.subscribe');
     // Route::post('tenants/{tenant}/resend-invitation', [TenantController::class, 'resendInvitation'])->name('tenants.resendInvitation');
     // });
-    Route::middleware(['auth', 'verified'])
+    Route::middleware(['auth', 'verified', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -116,6 +127,9 @@ Route::get('/dashboard', function () {
             ->only(['index', 'store', 'update', 'destroy'])
             ->middleware('permission:tenant.manage_users')
             ->names('users');
+
+        Route::get('configuracion', [ClientConfigurationController::class, 'index'])
+            ->name('configuracion.index');
 
         Route::post('clientes/{customer}/assign-plan', [ClientClienteController::class, 'assignPlan'])
             ->name('clientes.assign-plan');

@@ -276,10 +276,10 @@
 
                 {{-- Register link --}}
                 <p class="mt-7 text-center text-[13px] text-gray-500 fade-up delay-4">
-                    Don't have an account?
-                    <a href="mailto:admin@equinoxledger.com"
+                    ¿No tienes cuenta?
+                    <a href="{{ route('register') }}"
                        class="text-brand-accent hover:text-brand-accent-hover font-medium transition-colors">
-                        Contact your administrator
+                        Inicia tu prueba gratis
                     </a>
                 </p>
 

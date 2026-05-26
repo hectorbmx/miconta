@@ -145,11 +145,11 @@
             <div class="flex items-center justify-between gap-4">
                 <div>
                     <strong>Configura Stripe</strong>
-                    <p class="text-sm">Conecta tu cuenta para cobrar planes a tus clientes desde la plataforma.</p>
+                    <p class="text-sm">Conecta tu cuenta para cobrar honorarios a tus clientes desde la plataforma.</p>
                 </div>
-                <a href="{{ route('client.stripe.connect') }}"
+                <a href="{{ route('client.configuracion.index') }}"
                    class="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm font-semibold hover:bg-yellow-700">
-                    Conectar Stripe
+                    Configurar Stripe
                 </a>
             </div>
         </div>

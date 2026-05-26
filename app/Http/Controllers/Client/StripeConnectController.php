@@ -33,8 +33,8 @@ class StripeConnectController extends Controller
 
         $accountLink = $stripe->accountLinks->create([
             'account' => $tenant->stripe_account_id,
-            'refresh_url' => route('client.dashboard'),
-            'return_url' => route('client.dashboard'),
+            'refresh_url' => route('client.configuracion.index'),
+            'return_url' => route('client.configuracion.index'),
             'type' => 'account_onboarding',
         ]);
 
