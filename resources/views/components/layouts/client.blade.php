@@ -20,7 +20,7 @@
         {{-- LOGO --}}
         <div class="h-16 flex items-center justify-center border-b border-slate-800">
             <span class="text-xl font-bold text-white" x-show="sidebarOpen">
-                Panel Cliente
+                Panel Contador
             </span>
 
             <span class="text-xl font-bold text-white" x-show="!sidebarOpen">
@@ -46,7 +46,7 @@
                     ? 'bg-slate-800 text-white'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                 <span>👥</span>
-                <span x-show="sidebarOpen">Clientes</span>
+                <span x-show="sidebarOpen">Mis contribuyentes</span>
             </a>
         <a href="{{ route('client.customer-plans.index') }}"
         class="flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium
